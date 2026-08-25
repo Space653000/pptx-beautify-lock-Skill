@@ -20,6 +20,7 @@ def _load(name: str, filename: str):
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load {filename}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
