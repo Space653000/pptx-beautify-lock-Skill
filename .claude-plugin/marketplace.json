@@ -4,18 +4,21 @@
     "name": "Space653000",
     "url": "https://github.com/Space653000"
   },
-  "description": "Content-locked PPTX beautification skill for Claude Code, ChatGPT, Codex, and Agent-Skills-compatible agents.",
+  "description": "Source-faithful, content-locked PPTX beautification for Claude Code, ChatGPT, Codex, and Agent-Skills-compatible agents.",
   "plugins": [
     {
       "name": "pptx-beautify-lock",
       "source": "./",
-      "description": "PPTX Linter + Auto Formatter + Design Agent + rendered Visual QA + Regression Test with hard Content Lock.",
+      "description": "Content Lock + Source Theme Discovery/Guard + Traditional Chinese/English typography + PPTX Linter + Auto Formatter + Design Agent + Render Visual QA + Regression Test.",
       "category": "productivity",
       "keywords": [
         "powerpoint",
         "pptx",
         "slides",
         "content-lock",
+        "theme-lock",
+        "traditional-chinese",
+        "bilingual-typography",
         "design",
         "claude-code",
         "chatgpt",
