@@ -63,7 +63,31 @@ def valid_payload():
         "render_engine": "contract-test-renderer",
         "reviewer": "contract-test-reviewer",
         "audience_profile": "external top-tier technology customer engineering review",
+        "source_render_set": "source-render-sha256:aaa",
+        "final_render_set": "final-render-sha256:bbb",
         "review_rounds": 2,
+        "review_history": [
+            {
+                "round": 1,
+                "reviewer": "contract-test-reviewer",
+                "render_fingerprint": "candidate-render-1",
+                "source_render_reference": "source-render-sha256:aaa",
+                "final_render_reference": "candidate-render-1",
+                "findings_summary": "minor spacing refinement identified",
+                "actions_or_verification": "refined spacing and re-rendered",
+                "verdict": "fail",
+            },
+            {
+                "round": 2,
+                "reviewer": "contract-test-reviewer",
+                "render_fingerprint": "final-render-sha256:bbb",
+                "source_render_reference": "source-render-sha256:aaa",
+                "final_render_reference": "final-render-sha256:bbb",
+                "findings_summary": "no blocking world-class defects",
+                "actions_or_verification": "independent second verification completed",
+                "verdict": "pass",
+            },
+        ],
         "overall_pass": True,
         "deck_jury_score": 94,
         "jury_lenses": {
@@ -148,6 +172,14 @@ class GlobalDesignJuryGateTests(unittest.TestCase):
             result = run_gate(self.write_report(td, payload))
             self.assertNotEqual(0, result.returncode)
             self.assertIn("jury_lenses.executive_communication", result.stdout)
+
+    def test_integer_review_rounds_without_history_does_not_count_as_craft(self):
+        with tempfile.TemporaryDirectory() as td:
+            payload = deepcopy(valid_payload())
+            payload["review_history"] = []
+            result = run_gate(self.write_report(td, payload))
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("review_history length 0 != review_rounds 2", result.stdout)
 
 
 if __name__ == "__main__":
