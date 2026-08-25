@@ -14,20 +14,28 @@ python scripts/install_skill.py --target codex --force
 pptx-beautify-lock/SKILL.md
 ```
 
-When an existing PowerPoint must be beautified or repaired without content changes, use that Skill as the authoritative workflow.
+v0.6 不允許只用「沒有 overlap」或「看起來漂亮」宣稱完成。必須：
 
-v0.5 不允許只用「沒有 overlap」宣稱完成；必須辨識 Source Theme、Brand Terrain、Slide Role、Layout Skeleton，並執行 Spatial QA + Render Visual QA + Composition QA。
+```text
+Source Theme + Brand Terrain + Deck Identity discovery
+→ Layout Intelligence / Spatial QA
+→ Render Visual QA
+→ Composition QA
+→ Global Design Jury × 2 review rounds
+→ Regression v0.6
+```
 
-權威契約包括：
+權威契約：
 
 ```text
 pptx-beautify-lock/references/CONTENT_LOCK.md
 pptx-beautify-lock/references/THEME_DISCOVERY.md
 pptx-beautify-lock/references/TYPOGRAPHY_BILINGUAL.md
 pptx-beautify-lock/references/LAYOUT_INTELLIGENCE.md
+pptx-beautify-lock/references/GLOBAL_DESIGN_JURY.md
 ```
 
-Fully qualified **v0.5** delivery is complete only when the Skill's final regression reports:
+Fully qualified **v0.6** delivery requires:
 
 ```text
 CONTENT_LOCK_PASS=true
@@ -35,8 +43,10 @@ THEME_FIDELITY_PASS=true
 SPATIAL_QA_PASS=true
 VISUAL_QA_PASS=true
 COMPOSITION_QA_PASS=true
-REGRESSION_V05_PASS=true
-DELIVERY_V05_PASS=true
+DECK_IDENTITY_PASS=true
+GLOBAL_DESIGN_JURY_PASS=true
+REGRESSION_V06_PASS=true
+DELIVERY_V06_PASS=true
 ```
 
-Legacy `DELIVERY_PASS=true` 不得作為 v0.5 完成證明。
+Legacy `DELIVERY_PASS=true` / `DELIVERY_V05_PASS=true` 不得作為 v0.6 final 證明。
