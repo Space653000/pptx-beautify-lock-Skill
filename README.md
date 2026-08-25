@@ -18,16 +18,16 @@ PPTX Linter
 
 ## v0.3 核心特色
 
-- **硬性 Content Lock**：machine-readable semantic manifest/diff
+- **硬性 Content Lock**：machine-readable protected-semantics manifest/diff
 - **PPTX Linter**：geometry、tiny text、table density、overlap、edge、font/title consistency heuristics
 - **Auto Formatter / Design Agent contract**：AI 可大幅重做 layout/typography/table/chart styling
-- **Rendered Visual QA**：要求 AI/人逐頁看實際 render，不用 geometry heuristic 假裝「好看」
+- **Rendered Visual QA**：要求逐頁檢查實際 render，不以 geometry heuristic 假裝「好看」
 - **Regression Test**：Content + Layout + Visual 三類證據整合
 - **Plugin marketplace packaging**：可供 Claude Code / Codex 類 harness 安裝
 - **Traditional Chinese first + English compatibility**
-- **GitHub Actions contract tests**
+- **GitHub Actions public-CLI contract tests**
 
-## Single source of truth
+## Authoritative entry points / 權威入口
 
 正式 Agent 流程：
 
@@ -41,7 +41,16 @@ Content Lock 唯一定義：
 pptx-beautify-lock/references/CONTENT_LOCK.md
 ```
 
-不要從 README 推測細部規則；Agent 應讀 `SKILL.md` 與它在各階段指向的 references。
+Render 視覺驗證：
+
+```text
+pptx-beautify-lock/references/RENDER_VISUAL_QA.md
+```
+
+安裝方式：[`INSTALL.md`](INSTALL.md)  
+本次嚴謹審查紀錄：[`docs/QUALITY_AUDIT_2026-08-25.md`](docs/QUALITY_AUDIT_2026-08-25.md)
+
+README 只做導覽；Agent 應讀 `SKILL.md` 與它在每個 phase 指向的 references，避免重複規則長期 drift。
 
 ## 最終交付門檻
 
@@ -95,81 +104,45 @@ codex
 
 選擇 `space653000-pptx` → `pptx-beautify-lock`。
 
-也可直接安裝/連結 `pptx-beautify-lock/` 到 Agent Skills 目錄；詳見 [`INSTALL.md`](INSTALL.md)。
+也可直接安裝/連結 `pptx-beautify-lock/` 到 Agent Skills 目錄；詳見 `INSTALL.md`。
 
 ## Executable quality gates
 
-### Content snapshot
-
 ```bash
+# 1. Source content snapshot
 python pptx-beautify-lock/scripts/pptx_content_lock.py snapshot source.pptx --out content_manifest.json
-```
 
-### Linter
-
-```bash
+# 2. Structural/heuristic lint
 python pptx-beautify-lock/scripts/pptx_lint.py source.pptx --json > lint.before.json
-```
 
-### Content verification
-
-```bash
+# 3. Protected-semantic verification
 python pptx-beautify-lock/scripts/pptx_content_lock.py verify source.pptx output.pptx
-```
 
-### Render Visual QA report validation
-
-```bash
+# 4. Render-review report validation
 python pptx-beautify-lock/scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
-```
 
-### Final regression
-
-```bash
+# 5. Final release gate
 python pptx-beautify-lock/scripts/pptx_regression.py source.pptx output.pptx \
   --visual-qa-report visual_qa.json \
   --require-visual-qa
 ```
 
-## Repo 結構
+## Content Lock 保護範圍
 
-```text
-.
-├── README.md
-├── INSTALL.md
-├── AGENTS.md
-├── CLAUDE.md
-├── AI_BOOTSTRAP.md
-├── requirements.txt
-├── .claude-plugin/
-│   ├── plugin.json
-│   └── marketplace.json
-├── .github/workflows/
-│   └── test.yml
-├── tests/
-│   └── test_content_lock_contract.py
-└── pptx-beautify-lock/
-    ├── SKILL.md
-    ├── references/
-    │   ├── CONTENT_LOCK.md
-    │   ├── LINTER_RULES.md
-    │   ├── AUTO_FORMATTER_RULES.md
-    │   ├── DESIGN_AGENT_RULES.md
-    │   ├── DESIGN_RULES.md
-    │   ├── RENDER_VISUAL_QA.md
-    │   ├── REGRESSION_TEST_RULES.md
-    │   └── QA_RULES.md
-    └── scripts/
-        ├── pptx_content_lock.py
-        ├── pptx_lint.py
-        ├── visual_qa_gate.py
-        ├── pptx_regression.py
-        └── verify_layout.py
-```
+完整權威清單請看 `CONTENT_LOCK.md`。v0.3 verifier 已涵蓋文字/數值/表格/圖表/圖片之外，也保護容易被重建工具默默破壞的語意，包括：
 
-## Content Lock 現在會保護什麼？
+- hyperlink/action association
+- table merge topology
+- accessibility text
+- hidden-slide state
+- transition/timing semantics
+- comments/annotations
+- master/layout/SmartArt text
+- Office Math
+- media/embedded/OLE payloads
+- opaque custom XML / ActiveX / macro-like protected payloads
 
-權威清單請看 `CONTENT_LOCK.md`。v0.3 verifier 已涵蓋的不只文字/數字/表格/圖片，也包含 hyperlink/action、table merge topology、accessibility text、hidden-slide state、transition/timing semantics、comments/annotations、master/layout/SmartArt text、Office Math、media/embedded payload 等容易被重建工具默默破壞的內容。
+Verifier 以 content-bearing object 保留語意關聯，同時正規化 text-run segmentation，使純粹的字型/粗體/文字 run 重切不會被誤判成內容變更。
 
 ## 為什麼一定要 Render Visual QA？
 
@@ -177,10 +150,14 @@ OOXML/geometry 可以知道物件座標，卻無法可靠證明：
 
 - 字真的沒有 overflow/clipping
 - overlap 是刻意設計還是撞版
-- 表格實際投影是否可讀
+- 表格/圖表實際投影是否可讀
 - hierarchy / spacing / balance 是否真的漂亮
 
-所以「非常漂亮」必須經過 render → 每頁 review → repair，而不是只靠 Linter warning count。
+因此「非常漂亮」必須經過：
+
+```text
+render every slide → review every slide → repair → verify again
+```
 
 ## Automated tests
 
@@ -189,15 +166,18 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-GitHub Actions 至少驗證：
+GitHub Actions 的 contract tests 目前至少驗證：
 
-- visual-only geometry/typography change → Content Lock PASS
-- text/table value change → FAIL
-- table merge semantics change → FAIL
-- hyperlink target change → FAIL
+- visual-only geometry/typography change → PASS
+- identical text with different run segmentation → PASS
+- visible text/table value/table merge change → FAIL
+- hyperlink target or object association change → FAIL
 - hidden-slide state change → FAIL
 - table tiny text 可被 Linter 找到
-- Visual QA report 必須逐頁且所有 checks 完整
+- Visual QA report 必須逐頁且所有 required checks 完整
+- 沒有 Visual QA report 不得產生完整 delivery pass
+- 完整且合格的 Visual QA + 無 regression → `DELIVERY_PASS=true`
+- plugin manifests 指向可安裝 Skill
 
 ## Design principle
 
