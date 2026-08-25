@@ -44,9 +44,12 @@ def make_visual_report(path: Path):
         "alignment_consistent": True,
         "tables_charts_readable": True,
         "style_consistent": True,
+        "no_template_placeholder_artifacts": True,
+        "theme_fidelity_preserved": True,
+        "bilingual_typography_clean": True,
     }
     payload = {
-        "schema": 1,
+        "schema": 3,
         "slide_count": 1,
         "render_engine": "contract-test-renderer",
         "reviewer": "contract-test-reviewer",
@@ -77,6 +80,8 @@ class DeliveryContractTests(unittest.TestCase):
 
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             self.assertIn("CONTENT_LOCK_PASS=true", result.stdout)
+            self.assertIn("THEME_GUARD_PASS=true", result.stdout)
+            self.assertIn("THEME_FIDELITY_PASS=true", result.stdout)
             self.assertIn("LAYOUT_QA_PASS=true", result.stdout)
             self.assertIn("VISUAL_QA_PASS=true", result.stdout)
             self.assertIn("REGRESSION_PASS=true", result.stdout)
