@@ -48,6 +48,13 @@ def _intersection(a, b):
     return 0 if x2 <= x1 or y2 <= y1 else (x2 - x1) * (y2 - y1)
 
 
+def _vertical_overlap_ratio(a, b):
+    top = max(a.top, b.top)
+    bottom = min(a.top + a.height, b.top + b.height)
+    overlap = max(0, bottom - top)
+    return overlap / max(1, min(a.height, b.height))
+
+
 def _text(shape):
     if getattr(shape, "has_text_frame", False):
         return (shape.text or "").strip()
@@ -216,7 +223,9 @@ def compare_presentations(source, output):
                         )
                     )
 
-        # C. On technical/data slides, peer visuals should share rails and size.
+        # C. On technical/data slides, peer visuals in the SAME visual row should
+        # share rails and size. The vertical-overlap test intentionally prevents
+        # a 2x2 chart grid from comparing top-row charts against bottom-row charts.
         if _role(output_slide) == "data":
             visuals = [
                 shape
@@ -235,6 +244,8 @@ def compare_presentations(source, output):
                     first_center_x = (first.left + first.width / 2) / sw
                     second_center_x = (second.left + second.width / 2) / sw
                     if abs(first_center_x - second_center_x) < 0.18:
+                        continue
+                    if _vertical_overlap_ratio(first, second) < 0.45:
                         continue
                     top_drift = abs(first.top - second.top) / sh
                     height_drift = abs(first.height - second.height) / sh
