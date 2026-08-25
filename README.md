@@ -2,111 +2,110 @@
 
 **繁體中文為主 / English compatible**
 
-給 Claude Code、ChatGPT / Codex 與其他 Agent 使用的 **PowerPoint 內容鎖定自動美化 Skill**。
+給 Claude Code、ChatGPT / Codex 與其他 Agent 使用的 **PowerPoint 內容鎖定＋來源風格鎖定自動美化 Skill**。
 
-> **Content Lock：protected semantics 100% 凍結，只重新設計視覺呈現。**
+> **Content Lock：內容與 protected semantics 不可變。**  
+> **Theme Lock：未授權時不得翻轉來源 light/dark/mixed 主色調。**  
+> **Bilingual Typography：繁體中文＋英文都必須 glyph-safe、協調、可讀。**
 
-目標不是「把 PPT 重新寫一份」，而是把既有 `.pptx` 當成內容真實來源，執行：
+完整流程：
 
 ```text
-PPTX Linter
+Content Snapshot
+→ Source Theme Discovery / Visual DNA
+→ PPTX Linter
 → Auto Formatter
 → Design Agent
+→ Content + Theme Guard
 → Render Visual QA
 → Regression Test
 ```
 
-## v0.3 核心特色
+## v0.4 核心特色
 
-- **硬性 Content Lock**：machine-readable protected-semantics manifest/diff
-- **PPTX Linter**：geometry、tiny text、table density、overlap、edge、font/title consistency heuristics
-- **Auto Formatter / Design Agent contract**：AI 可大幅重做 layout/typography/table/chart styling
-- **Rendered Visual QA**：要求逐頁檢查實際 render，不以 geometry heuristic 假裝「好看」
-- **Regression Test**：Content + Layout + Visual 三類證據整合
-- **URL self-bootstrap**：repo 內建跨 Claude Code / Codex 的 `scripts/install_skill.py`
-- **Plugin marketplace packaging**：可供支援 marketplace 的 harness 安裝
-- **Traditional Chinese first + English compatibility**
-- **GitHub Actions public-CLI contract tests**
+- **Hard Content Lock**：machine-readable protected-semantics manifest/diff
+- **Source Theme Discovery**：先辨識原始主色、明暗極性、page-role pattern、theme/master/accent，再設計
+- **Theme Guard**：高信心攔截 light→dark、dark→light 與大面積 dark visual-mass drift
+- **Bilingual Typography**：繁中＋英文優先使用 CJK-safe family；偵測 Latin-only font 套在 CJK text 的 fallback risk
+- **Placeholder Guard**：`presentation title` / `click to add title` 等 template artifact 不得出現在 final
+- **PPTX Linter**：geometry、overlap、tiny text、table density、font/title consistency、placeholder、CJK fallback
+- **Rendered Visual QA schema 3**：逐頁檢查 source-theme fidelity、bilingual typography、placeholder leakage、clipping、hierarchy 等
+- **Regression Test**：Content + Theme + Layout + Visual 四層證據整合
+- **URL self-bootstrap**：Claude Code / Codex 共用 `scripts/install_skill.py`
+- **GitHub Actions contract tests**
 
 ## Authoritative entry points / 權威入口
 
-正式 Agent 流程：
+正式流程：
 
 ```text
 pptx-beautify-lock/SKILL.md
 ```
 
-Content Lock 唯一定義：
+核心 references：
 
 ```text
 pptx-beautify-lock/references/CONTENT_LOCK.md
-```
-
-Render 視覺驗證：
-
-```text
+pptx-beautify-lock/references/THEME_DISCOVERY.md
+pptx-beautify-lock/references/TYPOGRAPHY_BILINGUAL.md
 pptx-beautify-lock/references/RENDER_VISUAL_QA.md
 ```
 
-URL bootstrap 規則：[`AI_BOOTSTRAP.md`](AI_BOOTSTRAP.md)  
-安裝方式：[`INSTALL.md`](INSTALL.md)  
-本次嚴謹審查紀錄：[`docs/QUALITY_AUDIT_2026-08-25.md`](docs/QUALITY_AUDIT_2026-08-25.md)
-
-README 只做導覽；Agent 應讀 `SKILL.md` 與它在每個 phase 指向的 references，避免重複規則長期 drift。
+安裝：[`INSTALL.md`](INSTALL.md)  
+URL bootstrap：[`AI_BOOTSTRAP.md`](AI_BOOTSTRAP.md)  
+品質審查：[`docs/QUALITY_AUDIT_2026-08-25.md`](docs/QUALITY_AUDIT_2026-08-25.md)  
+Visual-DNA postmortem：[`docs/POSTMORTEM_2026-08-25_VISUAL_DNA.md`](docs/POSTMORTEM_2026-08-25_VISUAL_DNA.md)
 
 ## 最終交付門檻
 
-Fully qualified final PPTX 必須得到：
+Fully qualified final PPTX 必須：
 
 ```text
 CONTENT_LOCK_PASS=true
+THEME_FIDELITY_PASS=true
 LAYOUT_QA_PASS=true
 VISUAL_QA_PASS=true
 REGRESSION_PASS=true
 DELIVERY_PASS=true
 ```
 
-如果環境不能 render，最多只能產生 structural candidate；不可把它宣稱為完整 final。
+如果不能 render，只能產生 structural candidate，不可宣稱完整 final。
 
-## 最快使用方式：直接貼 GitHub URL
-
-把原始 PPTX 給 Claude Code 或 ChatGPT Codex，再貼：
+## 最快使用：直接貼 GitHub URL
 
 ```text
 https://github.com/Space653000/pptx-beautify-lock-Skill
 ```
 
-Agent 取得/開啟 repo 後，若宿主允許本機寫入與程式執行，會依 `CLAUDE.md` / `AGENTS.md` 自動 bootstrap：
+再告訴 Agent：
+
+```text
+Read this repository and use pptx-beautify-lock/SKILL.md.
+啟用 Content Lock + Theme Lock。
+先辨識來源主色調與繁中/英文字體，再美化。
+只有 DELIVERY_PASS=true 才交付 final PPTX。
+```
+
+若宿主允許本機寫入與程式執行：
 
 ```bash
 # Claude Code
 python scripts/install_skill.py --target claude --force
 
-# ChatGPT Codex / Codex
+# Codex
 python scripts/install_skill.py --target codex --force
-```
 
-共同安裝器也可一次部署兩邊：
-
-```bash
+# Both
 python scripts/install_skill.py --target both --force
 ```
 
-成功條件：
+成功：
 
 ```text
 INSTALL_PASS=true
 ```
 
-接著自動讀 `pptx-beautify-lock/SKILL.md` 並執行：
-
-```text
-Linter → Auto Formatter → Design Agent → Render Visual QA → Regression Test
-```
-
-只有 `DELIVERY_PASS=true` 才可宣稱 final。
-
-> **能力邊界：** 單純貼 URL 無法繞過宿主本身的安全限制。若宿主禁止下載/開啟 repo、禁止執行程式、或禁止寫入 `~/.claude/skills` / `~/.codex/skills`，Agent 必須直接從目前 repo 使用 Skill 並明確回報「未能持久安裝」，不得假裝安裝成功。
+> 單純貼 URL 不能繞過宿主安全權限。若禁止下載、執行或寫入 Skills 目錄，Agent 必須直接從 repo 使用 Skill，並明確回報「未持久安裝」。
 
 ## Plugin 安裝
 
@@ -117,71 +116,66 @@ claude plugin marketplace add https://github.com/Space653000/pptx-beautify-lock-
 claude plugin install pptx-beautify-lock@space653000-pptx
 ```
 
-### ChatGPT / Codex
-
-若目前 harness 支援 plugin marketplace：
-
-```bash
-codex plugin marketplace add Space653000/pptx-beautify-lock-Skill
-codex
-/plugins
-```
-
-選擇 `space653000-pptx` → `pptx-beautify-lock`。
+### Codex / compatible harness
 
 也可直接安裝/連結 `pptx-beautify-lock/` 到 Agent Skills 目錄；詳見 `INSTALL.md`。
 
 ## Executable quality gates
 
 ```bash
-# 1. Source content snapshot
+# 1. Content snapshot
 python pptx-beautify-lock/scripts/pptx_content_lock.py snapshot source.pptx --out content_manifest.json
 
-# 2. Structural/heuristic lint
+# 2. Source visual DNA
+python pptx-beautify-lock/scripts/pptx_theme_profile.py profile source.pptx --out theme_profile.json
+
+# 3. Lint
 python pptx-beautify-lock/scripts/pptx_lint.py source.pptx --json > lint.before.json
 
-# 3. Protected-semantic verification
+# 4. Content verification
 python pptx-beautify-lock/scripts/pptx_content_lock.py verify source.pptx output.pptx
 
-# 4. Render-review report validation
+# 5. Theme guard
+python pptx-beautify-lock/scripts/pptx_theme_profile.py compare source.pptx output.pptx --json
+
+# 6. Render QA
 python pptx-beautify-lock/scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
 
-# 5. Final release gate
+# 7. Final release gate
 python pptx-beautify-lock/scripts/pptx_regression.py source.pptx output.pptx \
   --visual-qa-report visual_qa.json \
   --require-visual-qa
 ```
 
-## Content Lock 保護範圍
+## Source Theme rule / 主色調規則
 
-完整權威清單請看 `CONTENT_LOCK.md`。v0.3 verifier 已涵蓋文字/數值/表格/圖表/圖片之外，也保護容易被重建工具默默破壞的語意，包括：
+Beautify ≠ Rebrand。
 
-- hyperlink/action association
-- table merge topology
-- accessibility text
-- hidden-slide state
-- transition/timing semantics
-- comments/annotations
-- master/layout/SmartArt text
-- Office Math
-- media/embedded/OLE payloads
-- opaque custom XML / ActiveX / macro-like protected payloads
+- source light → final 保持 light
+- source dark → final 保持 dark
+- source mixed → 保留 page-role pattern
+- source 有品牌色 → 沿用 hue family
+- 工程圖表的紅色 Limit marker 屬 semantic color，不代表整份 deck 應變紅
 
-Verifier 以 content-bearing object 保留語意關聯，同時正規化 text-run segmentation，使純粹的字型/粗體/文字 run 重切不會被誤判成內容變更。
+除非使用者明確要求換色系，AI 不得因偏好 navy/black 就把原本白底 deck 改 dark。
 
-## 為什麼一定要 Render Visual QA？
+## Traditional Chinese + English / 繁中英文
 
-OOXML/geometry 可以知道物件座標，卻無法可靠證明：
+預設保守策略：使用一個完整支援繁中的 Sans Serif family，同時承擔中英文，例如實際環境存在的：
 
-- 字真的沒有 overflow/clipping
-- overlap 是刻意設計還是撞版
-- 表格/圖表實際投影是否可讀
-- hierarchy / spacing / balance 是否真的漂亮
+- Noto Sans TC
+- Microsoft JhengHei / 微軟正黑體
+- PingFang TC / 蘋方-繁
+- Source Han Sans TC / 思源黑體 TC
 
-因此「非常漂亮」必須經過：
+Aptos / Inter / Arial / Helvetica 可用於 pure-Latin run，但不得讓含繁中的 mixed run 依賴不可控 fallback。
+
+Render QA 每頁必須：
 
 ```text
-render every slide → review every slide → repair → verify again
+theme_fidelity_preserved=true
+bilingual_typography_clean=true
+no_template_placeholder_artifacts=true
 ```
 
 ## Automated tests
@@ -191,27 +185,22 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-GitHub Actions 的 contract tests 目前至少驗證：
+目前 contract tests 至少驗證：
 
-- Claude Code / Codex installer 會把同一份 `SKILL.md` 安裝到兩個目標目錄
-- visual-only geometry/typography change → PASS
-- identical text with different run segmentation → PASS
-- visible text/table value/table merge change → FAIL
-- hyperlink target or object association change → FAIL
-- hidden-slide state change → FAIL
-- table tiny text 可被 Linter 找到
-- Visual QA report 必須逐頁且所有 required checks 完整
-- 沒有 Visual QA report 不得產生完整 delivery pass
-- 完整且合格的 Visual QA + 無 regression → `DELIVERY_PASS=true`
-- plugin manifests 指向可安裝 Skill
+- visual-only change → Content Lock PASS
+- text/table/hyperlink/hidden-state mutation → FAIL
+- template placeholder leakage → Linter ERROR
+- CJK text + Latin-oriented explicit font → fallback WARNING
+- light source → dark candidate → Theme Guard FAIL
+- light source + small accent → Theme Guard PASS
+- Visual QA schema 3 必須逐頁含 theme/bilingual/placeholder checks
+- 完整 Content + Theme + Layout + Visual QA → `DELIVERY_PASS=true`
+- Claude Code / Codex installer 指向同一份 Skill
 
-## Design principle
+## Important v0.3 correction
 
-有效輸出必須同時滿足：
+先前五份真實 deck 的 `DELIVERY_PASS=true` 是依舊 v0.3 contract 產生。實際人工檢查後發現 placeholder leakage 與 source-theme drift，因此那些輸出在 v0.4 下視為**需要重新處理的 candidate，不是 v0.4 final**。
 
-1. **protected content/behavior unchanged**
-2. **visual design materially improved**
-3. **PowerPoint native editability preserved whenever practical**
-4. **quality gates provide evidence, not promises**
+詳見 postmortem。
 
 Prompt-only promises are not proof.
