@@ -151,13 +151,7 @@ def main() -> int:
         delivery_ok = structural_ok and visual_ok
 
         # New strict v0.5 contract. This is the only fully-qualified delivery in v0.5.
-        regression_v05_ok = (
-            structural_ok
-            and visual_ok
-            and composition_ok
-            and (not args.require_visual_qa or visual_ok)
-            and (not args.require_composition_qa or composition_ok)
-        )
+        regression_v05_ok = structural_ok and visual_ok and composition_ok
         delivery_v05_ok = structural_ok and visual_ok and composition_ok
 
         result = {
@@ -177,11 +171,8 @@ def main() -> int:
                 or heuristic_warnings_remaining
                 or theme_result["THEME_REVIEW_REQUIRED"]
             ),
-            "COMPOSITION_QA_REQUIRED": (
-                args.require_composition_qa
-                or composition_review_required_by_structure
-                or True
-            ),
+            # v0.5 always requires rendered Composition QA for a qualified final.
+            "COMPOSITION_QA_REQUIRED": True,
             "SOURCE_CANVAS_MODE": source_theme.get("canvas_mode", "unknown"),
             "OUTPUT_CANVAS_MODE": output_theme.get("canvas_mode", "unknown"),
             "theme_review_required": theme_result["THEME_REVIEW_REQUIRED"],
