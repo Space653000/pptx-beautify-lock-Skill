@@ -1,30 +1,57 @@
-# AI Bootstrap
+# AI Bootstrap / AI 啟動入口
 
-Use this file when an AI assistant is given only the repository URL.
+> 給只拿到 GitHub repository URL 的 AI 使用。Traditional Chinese first; English included.
 
-## Task routing
+如果使用者提供此 repo URL 與一份既有 `.pptx`，並要求「內容不改、只美化」，請直接執行本 repo 的正式 Skill：
 
-If the task involves an existing `.pptx` and the user wants it prettier without changing content:
+```text
+pptx-beautify-lock/SKILL.md
+```
 
-1. Read `pptx-beautify-lock/SKILL.md` completely.
-2. Read all referenced files it marks as mandatory.
-3. Treat the source PPTX as immutable source-of-truth content.
-4. Create a semantic snapshot before editing.
-5. Redesign only the visual layer.
-6. Run layout QA and content-lock verification.
-7. Do not deliver unless verification passes.
+## 啟動條件 / Activation
 
-## Canonical user shorthand
+以下語意應啟動本 Skill：
 
-The following should activate the skill:
+- 美化這份 PPT，但不要改內容
+- 修復醜掉或跑版的 PowerPoint
+- 只改排版、字體、位置、表格與視覺
+- content lock
+- visual redesign only
+- keep all text/data/images exactly the same
+- fix overlap / overflow / layout without rewriting
 
-- "beautify this PPT without changing content"
-- "fix this ugly deck"
-- "repair PPT layout only"
-- "content lock"
-- "visual redesign only"
-- "keep all text/data/images exactly the same"
+## 強制執行順序 / Required order
 
-## Safety behavior
+```text
+1. Read SKILL.md and all mandatory references
+2. Backup source PPTX
+3. Create content snapshot
+4. PPTX Linter
+5. Auto Formatter
+6. Design Agent
+7. Re-run Linter
+8. Content verification
+9. Regression Test
+10. Render-based Visual QA when available
+11. Deliver only if all hard gates pass
+```
 
-When the agent lacks the ability to inspect/edit PPTX files or execute the verifier, it must state that limitation rather than claiming that the deck has been safely beautified.
+## Hard gates / 硬性門檻
+
+```text
+CONTENT_LOCK_PASS=true
+LAYOUT_QA_PASS=true
+REGRESSION_PASS=true
+```
+
+## Safety / 保守策略
+
+若 AI 沒有能力：
+
+- 讀取 PPTX
+- 修改/輸出 PPTX
+- 執行驗證腳本
+
+就必須明確說明限制，不得假裝已安全完成。
+
+If the agent cannot inspect/edit PPTX files or execute verification, it must state that limitation instead of claiming the deck was safely beautified.
