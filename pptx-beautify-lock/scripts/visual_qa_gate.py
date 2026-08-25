@@ -12,6 +12,8 @@ import argparse
 import json
 import sys
 
+VISUAL_QA_SCHEMA = 2
+
 REQUIRED_CHECKS = (
     "no_unintended_overlap",
     "no_clipping_or_overflow",
@@ -21,14 +23,15 @@ REQUIRED_CHECKS = (
     "alignment_consistent",
     "tables_charts_readable",
     "style_consistent",
+    "no_template_placeholder_artifacts",
 )
 
 
 def validate_report(report: dict, expected_slides: int, min_score: float = 85.0):
     errors: list[str] = []
 
-    if report.get("schema") != 1:
-        errors.append("schema must be 1")
+    if report.get("schema") != VISUAL_QA_SCHEMA:
+        errors.append(f"schema must be {VISUAL_QA_SCHEMA}")
 
     if report.get("slide_count") != expected_slides:
         errors.append(
@@ -103,6 +106,8 @@ def main() -> int:
 
     result = {
         "VISUAL_QA_PASS": ok,
+        "visual_qa_schema": VISUAL_QA_SCHEMA,
+        "required_checks": list(REQUIRED_CHECKS),
         "errors": errors,
         "expected_slides": args.expected_slides,
         "minimum_slide_score": args.min_score,
@@ -111,6 +116,7 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(f"VISUAL_QA_PASS={'true' if ok else 'false'}")
+        print(f"visual_qa_schema={VISUAL_QA_SCHEMA}")
         print(f"visual_qa_errors={len(errors)}")
         for error in errors:
             print(f"ERROR: {error}")
