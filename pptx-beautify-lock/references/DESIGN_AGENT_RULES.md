@@ -1,159 +1,191 @@
 # Design Agent 規範 / Design Agent Rules
 
-## 角色 / Role
+## Role / 角色
 
-Design Agent 負責在 **Content Lock 已建立、Source Theme Discovery 已完成、Linter 已完成、Auto Formatter 已做基礎修復** 後，進行大幅度但只限視覺層的重新設計。
+Design Agent 只負責視覺重構，但 v0.5 明確規定：**視覺重構必須先建立版面骨骼，不能先套樣式。**
 
-The Design Agent may redesign composition aggressively, but it must preserve every frozen content element **and the source visual DNA unless the user explicitly requests a rebrand/theme change**.
+完整前置契約：
 
-## 設計目標 / Design target
-
-- 專業、乾淨、現代、可直接上台
-- executive-ready / management-ready
-- 強烈但不誇張的視覺階層
-- 清楚的 grid、alignment、spacing rhythm
-- **沿著來源主色調、明暗極性與品牌氣質升級，不自行換皮**
-- 繁中＋英文都清楚、漂亮、glyph-safe
-- 跨頁一致的字體、色彩、標題與內容框架
-- 高資訊密度仍保持可掃讀性
-
-## Before design: Visual DNA / 設計前必讀
-
-必須先讀：
-
+- [`CONTENT_LOCK.md`](CONTENT_LOCK.md)
 - [`THEME_DISCOVERY.md`](THEME_DISCOVERY.md)
 - [`TYPOGRAPHY_BILINGUAL.md`](TYPOGRAPHY_BILINGUAL.md)
+- [`LAYOUT_INTELLIGENCE.md`](LAYOUT_INTELLIGENCE.md)
 
-並建立：
+## v0.5 design order / 設計順序
 
-```bash
-python scripts/pptx_theme_profile.py profile source.pptx --out theme_profile.json
+```text
+Soul / source visual DNA
+→ Frame / brand terrain + safe zones
+→ Skeleton / rails + grid + spacing rhythm
+→ Joints / grouping + reading order
+→ Limbs / text + table + chart + image placement
+→ Skin / typography + color + fills + borders
 ```
 
-如果環境可 render，必須看來源 render，尤其是首頁、section page、代表性 data/table/chart pages。
+**禁止反過來。** 若 AI 先加 navy panel、cards、gradient、漂亮字體，再想辦法把內容塞進去，視為錯誤流程。
 
-**不得在沒有 theme profile 的情況下直接決定 navy、black、gradient、corporate blue 等新主色。**
+## 1. Source render first / 來源 render 先於設計
 
-## 預設設計原則 / Default design principles
+若可 render，必須 render source 全頁。至少每頁辨識：
 
-### 1. Source theme first / 來源主色優先
+- slide role
+- brand chrome / logo / footer / department identity
+- full-bleed background terrain
+- title/content/footer safe zones
+- recurring alignment rails
+- visual center of gravity
+- intended reading order
 
-Beautify ≠ rebrand。
+品牌識別若烘焙在 layout/master full-slide image 中，也必須視為真實視覺內容。不能因為 `slide.shapes` 看不到獨立 logo 就把該區當空白。
+
+## 2. Source theme first / Beautify ≠ Rebrand
 
 - source light → final 保持 light
 - source dark → final 保持 dark
 - source mixed → 保留 page-role pattern
-- source 有品牌主色 → 以同 hue family 做 tint/shade/contrast 升級
+- source 有品牌主色 → 沿用 hue family
 
-除非使用者明確要求換色系，禁止 light ↔ dark 180° 翻轉。
+semantic red/green（limit、pass/fail）不能被誤當 brand primary。
 
-### 2. Hierarchy first / 階層優先
+## 3. Skeleton first / 骨骼優先
 
-先讓觀眾一眼知道：標題、結論、主要數據、支撐資訊、備註各是什麼角色。
+每頁先決定少量 rails：
 
-### 3. Fewer visual systems / 減少視覺語言數量
+- outer safe margins
+- title rail
+- content columns
+- summary/table top rail
+- chart/image row rails
+- footer baseline
 
-每份簡報原則上控制：
+同角色物件必須對齊到共同 rails。Keynote-style precision 是概念參考：edge、center、equal size、equal spacing 都應有明確關係，而不是靠肉眼隨意拖放。
 
-- 1 個主要 bilingual-safe font family，或最多 1 套 CJK + 1 套 Latin pairing
-- 來源既有主色 + 1–2 個受控輔助色 + neutrals
-- 2–4 個主要字級層級
+### Peer components
 
-### 4. Bilingual typography / 繁中英文兼容
+L/R、Before/After、A/B、四象限等 peer visuals：
 
-預設先選完整支援繁中的字族，讓中英文共享一致 baseline；只有在已驗證的 pure-Latin run 才考慮 Aptos/Inter 等 Latin family。
+- 同列優先等高等寬
+- 共用 top/bottom rail
+- labels 對齊各自 visual left edge
+- gutter 一致
+- 若 aspect ratio 必須不同，需要由內容本身解釋，不能只是 layout drift
 
-不得把含繁中的 mixed run 整段指定為 Latin-only font。
+## 4. Brand terrain / 品牌地形不可被新設計壓住
 
-### 5. Preserve editability / 保持 PowerPoint 可編輯性
+特別是 branded cover：
 
-優先保留 native PowerPoint shapes、text boxes、tables、charts。不得把整頁 flatten 為單一圖片。
+- 保留 source logo / department identity / footer / hero art 的呼吸空間
+- 大面積 opaque title panel 不是預設解法
+- 若要增加 panel，先確認它落在 source quiet zone，而不是覆蓋品牌主視覺
+- title、subtitle、date 應構成一個 group，不要讓 date 漂在無關位置
+- 不為了排版改寫 date string：`20260819` 不能自行變 `2026/08/19`
 
-### 6. Content density without chaos / 高密度但不混亂
+## 5. Spacing rhythm / 留白有階層
 
-可以重排物件、改欄數、改卡片式布局、改圖片與表格比例，但不得改內容本體。
+Whitespace 是骨骼的一部分：
 
-### 7. Visual consistency / 跨頁一致性
+- 同組 internal gap 較小
+- 組與組之間 gap 較大
+- 重複頁型使用重複 gap
+- 不把 dense content 全部擠在上半部、底部留大洞
+- 不為填滿空白而把 chart/table 無限制放大
 
-對同角色元素使用一致規則：
+如果一頁看起來「位置怪」，先查 rails、grouping、vertical rhythm、visual balance，不要先換顏色。
 
-- title zone
-- subtitle zone
-- content grid
-- footer/page number
-- table headers
-- chart title/legend/axis styling
-- canvas polarity / background family
-- bilingual font policy
+## 6. Hierarchy and reading order / 階層與視線順序
 
-## 允許的大幅重構 / Aggressive visual redesign allowed
+每頁必須讓 reviewer 能在約 3 秒說出：
 
-- 單欄改雙欄或多欄
-- 重新排列文字框、表格、圖片、圖表的空間關係
-- 將零散文字框收斂到一致 grid
-- 在**來源 Theme Lock 範圍內**重做區塊、卡片、分隔線、accent
-- 重新設計表格視覺樣式
-- 重新設計 chart visual styling
-- 重新安排文字與圖片比例
+1. 這頁是什麼？
+2. 第一眼看哪裡？
+3. 第二眼看哪裡？
+4. 哪些是同一組？
 
-但必須保持：
+位置、字級、contrast、proximity 共同建立 hierarchy；不能只靠粗體與大字。
 
-- 所有原文字仍存在且字元完全相同
-- 所有表格資料與結構仍相同
-- 所有圖表資料仍相同
-- 所有圖片 payload 與 crop state 不變
-- 頁面數與順序不變
-- source canvas polarity / visual DNA 不被無授權翻轉
+## 7. Restraint / 美感不是裝飾量
 
-## 禁止的「假美化」 / Forbidden shortcuts
-
-- 為了乾淨而刪掉一半文字
-- 將內容改寫成三個 bullet
-- 把表格資料改成摘要卡片並移除原表格
-- 重新生成相似圖片替代原圖片
-- 將整頁 rasterize / flatten 成圖片
-- 因為版面不好處理就新增或刪除投影片
-- **因為 AI 偏好深藍科技感，就把原本白底 deck 改 dark navy**
-- **因為英文使用 Inter/Aptos，就讓繁中依賴不可控 fallback**
-- 把圖表中的警告紅/limit red 誤當成整份 deck brand primary
-
-## Template placeholder handling / 母片 placeholder
-
-若 source/master/layout 帶有 `presentation title`、`click to add title` 等 generic placeholder：
-
-- 真正來源內容優先
-- final 不得 render generic template prompt
-- 不得為了消除重疊而刪除真正標題
-- 優先用 layout assignment、blank/content-safe layout、placeholder visibility/instance handling 解決
-- 每輪都重新 Content Lock verify
-
-## Visual QA / 視覺驗收
-
-若環境可 render PPTX，必須逐頁看 render 結果，至少檢查：
+優先移除無作用的 framing、cards、lines、badges、shadows。Decorative element 必須至少服務其中一項：
 
 - hierarchy
-- alignment
-- whitespace
-- typography
-- bilingual glyph/font consistency
-- source-theme fidelity
-- table readability
-- chart readability
-- image balance
-- clipping
-- overlap
-- template-placeholder artifacts
-- cross-slide consistency
+- grouping
+- navigation
+- brand continuity
 
-若有能力使用 vision model，將 source + final render 當成 QA 輸入，但**不得讓 vision model 改寫內容**。
+否則不要加。
 
-## 完成門檻 / Exit gate
+## 8. Dense technical/data slides / 工程資料頁
 
-Design Agent 完成後不得直接交付。至少先執行：
+POWER / THD / HOHD 這類頁面，預設先建立：
 
-```bash
-python scripts/pptx_theme_profile.py compare source.pptx candidate.pptx --json
-python scripts/pptx_content_lock.py verify source.pptx candidate.pptx
+```text
+header/title/status band
+↓
+summary + table band
+↓
+peer chart/image band
+↓
+footer brand zone
 ```
 
-Theme Guard 或 Content Lock 任一失敗，都必須 repair；通過後才進入 Render Visual QA + Regression Test。
+要求：
+
+- title/status/logo 各有自己的 anchor，不互搶
+- summary/table 視覺 top edge 對齊
+- 同 row charts 共用尺寸與 rails
+- chart headings 貼著各自 chart system
+- table border/grid 要退居內容之後
+- 盡量使用完整 body 高度取得平衡，但不能侵入 footer
+
+## 9. Bilingual typography / 繁中英文兼容
+
+- mixed CJK/Latin 優先 bilingual-safe family
+- pure Latin 才可使用 Latin-specific family
+- `% / σ / Hz / dB / 負號 / 數字` 技術符號要 render 正常
+- glyph fallback 造成 baseline、overflow、字重跳動都要修
+
+## 10. Placeholder vs brand chrome / 不要把品牌當 placeholder
+
+Generic template prompts（`presentation title`, `Click to add title`）應停用；但品牌 logo、department identity、copyright、hero art 不是 placeholder。
+
+若 source 真正內容與 master artifact 衝突：
+
+1. 保留真正內容
+2. 辨識 artifact vs brand chrome
+3. 用 content-safe layout/visibility/geometry 解決
+4. render source/final 比對
+5. 再跑 Content Lock
+
+## 11. Repair loop / 修復循環
+
+最多 3 輪：
+
+```text
+source render + theme + layout discovery
+→ design
+→ Content Lock
+→ Theme Guard
+→ Spatial QA
+→ render all slides
+→ Visual QA
+→ Composition QA
+→ repair
+```
+
+若 Spatial QA 出現 warning，Composition QA 必須直接針對該頁證明 brand / balance / grid 沒問題；不能忽略 warning 後自行給高分。
+
+## 12. Exit gate / v0.5 完成門檻
+
+Design Agent 不得用「看起來不錯」當結論。完全合格需要：
+
+```text
+CONTENT_LOCK_PASS=true
+THEME_FIDELITY_PASS=true
+SPATIAL_QA_PASS=true
+VISUAL_QA_PASS=true
+COMPOSITION_QA_PASS=true
+REGRESSION_V05_PASS=true
+DELIVERY_V05_PASS=true
+```
+
+任何 false：candidate 不是 v0.5 final。
