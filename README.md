@@ -1,88 +1,91 @@
 # pptx-beautify-lock-Skill
 
-**繁體中文 / English**
+**繁體中文為主 / English compatible**
 
-一個給 AI Agent 使用的 **PowerPoint 自動美化 Skill**，核心是「**內容 100% 凍結，只重新設計視覺層**」。
+這是一個給 Claude Code、ChatGPT / Codex 與其他 AI Agent 使用的 **PowerPoint 自動美化 Skill**。
 
-A cross-agent **PowerPoint visual redesign skill with a hard content lock**.
+核心要求只有一句：
 
-> **內容完全不改，視覺可以大幅重做。**  
+> **內容 100% 凍結，AI 只准重新設計視覺層。**
+
+A cross-agent PowerPoint beautification skill with a hard content lock:
+
 > **Preserve presentation content exactly. Redesign only the visual layer.**
-
-主要目標平台：
-
-- Claude Code
-- ChatGPT / Codex
-- 其他支援 Agent Skills 或能讀取 `SKILL.md` 的 coding agents
 
 ---
 
-## 核心契約 / Core contract
+## 四大模組 / Four-stage architecture
 
-來源 `.pptx` 是唯一真實來源。
+```text
+SOURCE PPTX
+   ↓
+1. PPTX LINTER
+   找出跑版、重疊、字太小、邊界、字型與一致性問題
+   ↓
+2. AUTO FORMATTER
+   自動修復幾何、對齊、間距、字級、表格、圖表配置
+   ↓
+3. DESIGN AGENT
+   在 Content Lock 下重新設計整體視覺系統
+   ↓
+4. REGRESSION TEST
+   驗證內容零變更、版面無退化、PPTX 可交付
+   ↓
+FINAL PPTX
+```
 
-The source `.pptx` is the single source of truth.
+The four stages are:
 
-### 內容凍結 — 絕對不能改 / Frozen content — MUST NOT change
+1. **PPTX Linter** — detect layout defects and consistency risks.
+2. **Auto Formatter** — conservatively repair geometry and formatting.
+3. **Design Agent** — aggressively improve the visual layer only.
+4. **Regression Test** — prove content integrity and layout quality before delivery.
 
-- 投影片頁數與順序 / slide count and slide order
-- 所有文字、標點、數字、單位、公式、符號與語言 / all visible text and symbols
-- 表格結構、合併關係、列欄順序、cell values / table structure and values
-- 圖表 categories、series、source values、formulas、embedded workbook data
-- 圖片與媒體 payload、crop state / image/media bytes and crop state
-- Speaker Notes / 備註文字
-- embedded files / 嵌入檔案
+---
+
+## 內容凍結 / Content Lock
+
+來源 `.pptx` 是唯一內容真實來源。
+
+**絕對不能改：**
+
+- 投影片頁數與順序
+- 所有文字、標點、數字、單位、公式、符號、語言
+- 表格結構、列欄順序、合併關係、所有 cell values
+- 圖表 categories、series、source values、formulas、cached data、embedded workbook
+- 圖片/影音 payload
+- 圖片 crop state
+- Speaker Notes
+- embedded files
 
 AI 不得為了排版方便而：
 
 - 改寫
 - 摘要
 - 翻譯
-- 校正文法或拼字
-- 新增或刪除
-- 合併或拆頁
-- 重排頁面
-
-The agent must never rewrite, summarize, translate, spell-correct, add, delete, merge, split, or reorder source content.
-
-### 視覺層 — 可以改 / Visual layer — MAY change
-
-- 字型、字級、粗細、顏色 / typography
-- 文字框位置、尺寸、內距 / text-box geometry
-- 行距、段距、對齊 / spacing and alignment
-- 物件位置與大小 / object position and size
-- 留白、grid / whitespace and grid
-- 表格欄寬、列高、padding、fill、border
-- 圖表配色、字型、legend、axis、plot-area 等「不碰資料」的 styling
-- 背景、陰影、border、accent、visual hierarchy
-- 圖片位置與顯示尺寸；不得換圖或改 crop
-- 修復 overlap、overflow、clipping、out-of-bounds
+- 校正文法、拼字或標點
+- 新增或刪除內容
+- 合併或拆分投影片
+- 改變頁面順序
+- 用生成圖片或相似圖片替代原圖
+- 將整頁可編輯內容 flatten 成一張圖片
 
 ---
 
-## 最重要的 Fail-closed 原則
+## 可以改的視覺層 / Visual layer may change
 
-如果內容塞不下，**不能改字或刪字**。
+- 字型、字級、粗細、顏色
+- 文字框位置、尺寸、內距
+- 行距、段距、alignment
+- 物件位置與大小
+- whitespace、grid、alignment、distribution
+- 表格欄寬、列高、cell padding、fill、border
+- chart styling、legend、axis、plot area，但不得改 chart data
+- 背景、shadow、border、accent、visual hierarchy
+- 圖片顯示位置與大小，但不得換圖或改 crop
+- overlap、overflow、clipping、out-of-bounds 修復
 
-If content does not fit, **do not rewrite it**.
-
-AI 應改用：
-
-1. 重排 layout
-2. 擴大可用區域
-3. 減少 padding / margins
-4. 重分配 whitespace
-5. 移動或縮放其他物件
-6. 調整 table geometry
-7. 最後才在可讀範圍內降低字級
-
-最終只有在驗證器輸出：
-
-```text
-CONTENT_LOCK_PASS=true
-```
-
-才可以交付。
+如果內容塞不下，**只能重排版，不准改字。**
 
 ---
 
@@ -96,127 +99,166 @@ CONTENT_LOCK_PASS=true
 ├── CLAUDE.md
 ├── AI_BOOTSTRAP.md
 ├── requirements.txt
+├── tests/
+│   └── test_content_lock_contract.py
+├── .github/workflows/
+│   └── test.yml
 └── pptx-beautify-lock/
     ├── SKILL.md
     ├── references/
     │   ├── CONTENT_LOCK.md
+    │   ├── LINTER_RULES.md
+    │   ├── AUTO_FORMATTER_RULES.md
+    │   ├── DESIGN_AGENT_RULES.md
+    │   ├── REGRESSION_TEST_RULES.md
     │   ├── DESIGN_RULES.md
     │   └── QA_RULES.md
     └── scripts/
         ├── pptx_content_lock.py
-        └── verify_layout.py
+        ├── pptx_lint.py
+        ├── verify_layout.py
+        └── pptx_regression.py
 ```
 
 ---
 
-## 最簡單用法 / Fastest use
+## 未來最簡單的用法 / Fastest use
 
-未來只要：
-
-1. 把 PPTX 給 AI
-2. 貼上這個 GitHub repo URL
-3. 下這段指令
+把 PPTX 給 AI，再貼這個 repository URL，然後只要說：
 
 ```text
-Read this repository and follow pptx-beautify-lock/SKILL.md.
+Read this repository and use pptx-beautify-lock/SKILL.md.
 
-啟用 CONTENT LOCK：內容 100% 凍結，只重新設計視覺層。
-不要修改任何文字、數字、表格資料、圖表資料、圖片內容、備註、頁數或頁面順序。
+請對這份 PPTX 執行：
+PPTX Linter → Auto Formatter → Design Agent → Regression Test。
 
-可以全面修正：
-字型、字級、位置、大小、留白、對齊、表格尺寸、色彩、背景、視覺階層、overlap、overflow、clipping。
+啟用 CONTENT LOCK：內容 100% 凍結，只允許重新設計視覺層。
+不得修改文字、數字、表格資料、圖表資料、圖片內容、crop、備註、頁數或頁面順序。
 
-完成後必須執行 content verification、layout QA 與可用時的 visual render QA。
-只有 CONTENT_LOCK_PASS=true 才能交付。
+自動修復字型、字級、位置、留白、對齊、表格尺寸、色彩、背景、視覺階層、overlap、overflow，並將整體設計提升到專業可上台品質。
+
+不要逐頁問我；自行完成。
+只有 CONTENT_LOCK_PASS=true、LAYOUT_QA_PASS=true、REGRESSION_PASS=true 才能交付。
 ```
 
 ---
 
-## Claude Code / Codex 安裝
+## 可執行工具 / Executable quality gates
 
-真正可安裝的 Skill 目錄是：
+### 1. 建立內容快照
+
+```bash
+python pptx-beautify-lock/scripts/pptx_content_lock.py snapshot input.pptx --out content_manifest.json
+```
+
+### 2. PPTX Linter
+
+```bash
+python pptx-beautify-lock/scripts/pptx_lint.py input.pptx --json
+```
+
+### 3. 美化後驗證內容
+
+```bash
+python pptx-beautify-lock/scripts/pptx_content_lock.py verify input.pptx output.beautified.pptx
+```
+
+必須得到：
+
+```text
+CONTENT_LOCK_PASS=true
+```
+
+### 4. Regression Test
+
+```bash
+python pptx-beautify-lock/scripts/pptx_regression.py input.pptx output.beautified.pptx
+```
+
+必須得到：
+
+```text
+REGRESSION_PASS=true
+CONTENT_LOCK_PASS=true
+LAYOUT_QA_PASS=true
+```
+
+---
+
+## 為什麼不是只寫一段 Prompt？
+
+因為「AI 說它沒有改內容」不等於真的沒有改內容。
+
+這個 repo 使用 machine-verifiable gates：
+
+- semantic content manifest
+- media / embedded payload hashing
+- chart semantics comparison
+- image crop-state comparison
+- PPTX layout linting
+- source-vs-output regression comparison
+- automated contract tests
+
+Prompt-only promises are not proof. The repository includes executable verification.
+
+---
+
+## 自動測試 / Automated tests
+
+GitHub Actions 會執行 Content Lock contract tests，其中至少驗證：
+
+- **只改字級/位置 → PASS**
+- **改一個文字 → FAIL**
+- **改一個表格數值 → FAIL**
+- Linter 可解析有效 PPTX
+
+本機可執行：
+
+```bash
+pip install -r requirements.txt
+python -m unittest discover -s tests -v
+```
+
+---
+
+## Claude Code / Codex
+
+真正可安裝的 Skill 目錄：
 
 ```text
 pptx-beautify-lock/
 ```
 
-詳細安裝方式請看：
+若直接開啟整個 repo：
 
-```text
-INSTALL.md
-```
+- Claude Code 會看到 `CLAUDE.md`
+- Codex / coding agents 可讀 `AGENTS.md`
+- 只拿到 URL 的其他 AI 可先讀 `AI_BOOTSTRAP.md`
 
-Typical patterns:
-
-```text
-~/.claude/skills/pptx-beautify-lock/
-~/.codex/skills/pptx-beautify-lock/
-```
-
-若版本路徑不同，以當前 Claude Code / Codex 官方機制為準。
+詳細安裝方式請見 `INSTALL.md`。
 
 ---
 
-## 強制流程 / Mandatory pipeline
+## 設計目標 / Design target
 
-```text
-input.pptx
-   ↓
-immutable backup / 保留原檔
-   ↓
-content snapshot / 內容快照
-   ↓
-render + inspect original slides
-   ↓
-visual-only redesign / 只改視覺
-   ↓
-layout QA + render QA
-   ↓
-content verification / 內容驗證
-   ↓
-PASS → final.pptx
-FAIL → reject and repair
-```
+不是「不重疊」就算成功，而是同時做到：
 
-只靠 Prompt 說「不要改內容」不夠。這個 repo 內建 Python verifier，會以機器方式比對美化前後的 frozen content。
-
-Prompt-only promises are not proof. The bundled verifier performs machine-readable semantic comparison.
-
----
-
-## 設計目標 / Design objective
-
-不是「沒有重疊」就算完成。
-
-目標是：
-
-- executive-ready / 可直接上台
+- executive-ready
 - clean, modern, restrained
-- clear visual hierarchy
+- strong visual hierarchy
 - consistent typography and spacing
 - readable tables and charts
 - no unintended overlap / overflow / clipping
 - consistent cross-slide design language
 - native PowerPoint editability whenever possible
-
-有效的輸出必須同時滿足：
-
-1. **內容完全一致 / semantically identical**
-2. **視覺顯著改善 / materially better designed**
+- **source content remains unchanged**
 
 ---
 
-## 重要限制 / Important limitation
+## Fail closed / 保守失敗策略
 
-只貼 GitHub URL 並不會自動賦予 AI 檔案系統、PowerPoint 編輯或程式執行能力。
+如果 AI 或工具無法證明內容一致，必須判定失敗，而不是猜測。
 
-Pasting the repo URL does not itself grant an AI file-system or PowerPoint-editing capabilities.
+如果環境無法讀取、修改 PPTX 或執行驗證，也必須明確說明限制，不能假裝已安全完成。
 
-AI 仍然必須能：
-
-- 讀取輸入 `.pptx`
-- 修改或重新建立 `.pptx`
-- 執行驗證腳本
-- 最好能 render 投影片做 visual QA
-
-如果環境做不到，AI 應明確說明限制，而不是假裝已安全完成。
+The workflow must fail closed whenever content integrity cannot be verified.
