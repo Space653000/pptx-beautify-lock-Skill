@@ -1,44 +1,17 @@
 # AGENTS.md
 
-> 繁體中文優先 / Traditional Chinese first. English included for compatibility.
-
-本 repository 的正式 Agent Skill：
+當任務是**既有 PPT/PPTX 不改內容，只美化、修排版、修重疊/overflow、統一格式或重新設計視覺**時，先讀並執行：
 
 ```text
 pptx-beautify-lock/SKILL.md
 ```
 
-當任務是「既有 PowerPoint 不改內容，只修排版、重做視覺、變得更漂亮」時，必須先讀完整 Skill 與其 mandatory references。
+When an existing PowerPoint must be beautified or repaired without content changes, use that Skill as the authoritative workflow.
 
-When the task is to beautify, repair, restyle, or professionally redesign an existing PowerPoint without changing its content, read and obey the Skill before editing.
+**Content Lock 的唯一定義：** `pptx-beautify-lock/references/CONTENT_LOCK.md`。
 
-## 強制管線 / Mandatory pipeline
-
-```text
-PPTX Linter
-→ Auto Formatter
-→ Design Agent
-→ Regression Test
-```
-
-## 絕對規則 / Absolute rule
-
-**CONTENT LOCK is mandatory. / 內容 100% 凍結。**
-
-不得改寫、摘要、翻譯、校字、增刪、合併、拆分或重排來源內容。只允許修改視覺層。
-
-Never rewrite, summarize, translate, spell-correct, add, delete, merge, split, or reorder source content. Only the visual layer may change.
-
-## 交付門檻 / Delivery gates
-
-交付前至少必須得到：
+Fully qualified delivery is complete only when the Skill's final regression reports:
 
 ```text
-CONTENT_LOCK_PASS=true
-LAYOUT_QA_PASS=true
-REGRESSION_PASS=true
+DELIVERY_PASS=true
 ```
-
-如果環境可 render PPTX，還必須做逐頁 Visual QA。
-
-Do not claim success when these gates cannot be verified.
