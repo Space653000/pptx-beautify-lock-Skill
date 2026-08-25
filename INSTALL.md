@@ -1,59 +1,80 @@
 # 安裝方式 / Installation
 
-本專案的可安裝 Skill 位於：
+本 repo 同時提供：
+
+1. **Plugin marketplace 安裝**（最省事）
+2. **直接安裝 `pptx-beautify-lock/` Skill 目錄**
+3. **只貼 GitHub URL，由 Agent 讀取 `SKILL.md`**
+
+## Claude Code — Plugin marketplace
+
+```bash
+claude plugin marketplace add https://github.com/Space653000/pptx-beautify-lock-Skill
+claude plugin install pptx-beautify-lock@space653000-pptx
+```
+
+Claude Code 內也可以使用對應 `/plugin` 指令加入 marketplace 與安裝 plugin。
+
+安裝後，當任務是既有 PPTX「內容不變，只美化/修版」時，model 應依 Skill description 自動選用 `pptx-beautify-lock`。
+
+## ChatGPT / Codex — Plugin marketplace
+
+若目前 Codex/ChatGPT harness 支援 plugin marketplace：
+
+```bash
+codex plugin marketplace add Space653000/pptx-beautify-lock-Skill
+codex
+/plugins
+```
+
+選擇 `space653000-pptx` marketplace，安裝 `pptx-beautify-lock`。
+
+## Editable Skill files / 直接安裝 Skill
+
+真正的 Skill 目錄：
 
 ```text
 pptx-beautify-lock/
 ```
 
-## Claude Code
-
-將 `pptx-beautify-lock/` 放入或連結到 Claude Code 支援的 Skills 目錄，或直接用 Claude Code 開啟本 repo；根目錄 `CLAUDE.md` 會引導它讀取 `pptx-beautify-lock/SKILL.md`。
-
-Typical pattern:
+Typical local patterns：
 
 ```text
 ~/.claude/skills/pptx-beautify-lock/
-```
-
-如果 Claude Code 版本的 Skills 路徑不同，以該版本官方設定為準。
-
-## ChatGPT / Codex
-
-將 `pptx-beautify-lock/` 安裝到目前 Codex / ChatGPT Skills 所支援的位置，或讓 Codex 直接開啟本 repo；根目錄 `AGENTS.md` 會將任務導向同一份 Skill。
-
-Typical local pattern:
-
-```text
 ~/.codex/skills/pptx-beautify-lock/
 ```
 
-## Shared source / 共用一份來源
+若宿主版本的 Skills 路徑不同，以該版本支援的 Agent Skills 安裝機制為準。
 
-建議只維護一份 Skill source，再由 Claude Code 與 Codex 各自建立 symbolic link / junction，避免兩份規則日後分歧。
+也可以只維護一份 shared source，再對 Claude Code/Codex 建 symbolic link 或 Windows junction，避免規範分叉。
 
-Example on Windows conceptually:
+## 只貼 URL / URL-only bootstrap
+
+把 PPTX 給 AI 並貼：
 
 ```text
-C:\AI\SharedSkills\pptx-beautify-lock
-          ↑                     ↑
-~\.claude\skills\...      ~\.codex\skills\...
+https://github.com/Space653000/pptx-beautify-lock-Skill
 ```
 
-## Python dependency
+然後說：
 
-內容驗證器使用 Python 標準函式庫；版面幾何 QA 需要：
+```text
+Read this repository and use pptx-beautify-lock/SKILL.md on this PPTX.
+啟用 Content Lock，只重新設計視覺層；只有 DELIVERY_PASS=true 才交付 final PPTX。
+```
+
+根目錄入口：
+
+- Claude Code: `CLAUDE.md`
+- Codex/coding agents: `AGENTS.md`
+- generic URL-only agent: `AI_BOOTSTRAP.md`
+
+## Python dependencies
+
+驗證/Linter scripts 需要：
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Recommended usage / 建議使用方式
-
-給 AI 一份 PPTX，再貼上本 GitHub repo URL，並下達：
-
-```text
-Read this repository and use pptx-beautify-lock.
-啟用 CONTENT LOCK：內容 100% 凍結，只重新設計視覺層。
-完成後一定要通過 content verification 與 layout QA。
-```
+完整品質流程除了 Python scripts，還需要宿主本身具備 PPTX 編輯與 render 能力。若無 render 能力，依 `SKILL.md` 只能產生 structural candidate，不能宣稱完整 `DELIVERY_PASS=true`。
