@@ -1,0 +1,25 @@
+{
+  "name": "pptx-beautify-lock",
+  "version": "0.3.0",
+  "description": "Content-locked PowerPoint beautification: PPTX Linter, Auto Formatter, Design Agent, rendered Visual QA, and Regression Test for Claude Code, ChatGPT, and Codex.",
+  "author": {
+    "name": "Space653000",
+    "url": "https://github.com/Space653000"
+  },
+  "homepage": "https://github.com/Space653000/pptx-beautify-lock-Skill",
+  "repository": "https://github.com/Space653000/pptx-beautify-lock-Skill",
+  "license": "MIT",
+  "keywords": [
+    "powerpoint",
+    "pptx",
+    "slides",
+    "beautify",
+    "content-lock",
+    "claude-code",
+    "chatgpt",
+    "codex"
+  ],
+  "skills": [
+    "./pptx-beautify-lock"
+  ]
+}
