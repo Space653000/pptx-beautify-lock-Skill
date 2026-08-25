@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regression quality gate for pptx-beautify-lock.
 
-Checks protected content integrity, source-theme fidelity, structural/layout
-regression, and rendered-slide visual QA before delivery.
+v0.5 keeps the v0.4 delivery fields for compatibility and adds a stricter
+v0.5 contract that requires spatial structure plus rendered composition QA.
 """
 
 from __future__ import annotations
@@ -41,9 +41,12 @@ def main() -> int:
     ap.add_argument("source", help="Original source PPTX / 原始 PPTX")
     ap.add_argument("output", help="Beautified output PPTX / 美化後 PPTX")
     ap.add_argument("--visual-qa-report", help="visual_qa.json created after rendered-slide review")
-    ap.add_argument("--require-visual-qa", action="store_true",
-                    help="Fail delivery unless exhaustive rendered-slide visual QA passes")
+    ap.add_argument("--require-visual-qa", action="store_true")
     ap.add_argument("--min-visual-score", type=float, default=85.0)
+    ap.add_argument("--composition-qa-report", help="composition_qa.json created after source-vs-final composition review")
+    ap.add_argument("--require-composition-qa", action="store_true")
+    ap.add_argument("--min-composition-dimension", type=float, default=88.0)
+    ap.add_argument("--min-composition-score", type=float, default=90.0)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -51,24 +54,25 @@ def main() -> int:
         lock = _load("pptx_content_lock", "pptx_content_lock.py")
         lint = _load("pptx_lint", "pptx_lint.py")
         theme = _load("pptx_theme_profile", "pptx_theme_profile.py")
+        spatial = _load("pptx_layout_intelligence", "pptx_layout_intelligence.py")
         visual_gate = _load("visual_qa_gate", "visual_qa_gate.py")
+        composition_gate = _load("composition_qa_gate", "composition_qa_gate.py")
 
-        # 1. Protected content semantics
+        # 1. Protected content semantics.
         before_manifest = lock.build_manifest(args.source)
         after_manifest = lock.build_manifest(args.output)
         content_diffs = lock.diff(before_manifest, after_manifest)
         content_ok = len(content_diffs) == 0
 
-        # 2. Source visual DNA / theme polarity guard
+        # 2. Source visual DNA / theme polarity guard.
         source_theme = theme.profile_presentation(args.source)
         output_theme = theme.profile_presentation(args.output)
         theme_result = theme.compare_profiles(source_theme, output_theme)
         theme_guard_ok = bool(theme_result["THEME_GUARD_PASS"])
 
-        # 3. Structural/layout lint
+        # 3. Structural lint.
         baseline = lint.scan_presentation(args.source)
         output = lint.scan_presentation(args.output)
-
         no_error_regression = output["lint_errors"] <= baseline["lint_errors"]
         final_hard_errors_zero = output["lint_errors"] == 0
 
@@ -78,11 +82,19 @@ def main() -> int:
             after_warnings[rule] <= before_warnings[rule]
             for rule in BLOCKING_WARNING_RULES
         )
-
         heuristic_warning_rules = sorted(
             (set(before_warnings) | set(after_warnings)) - BLOCKING_WARNING_RULES
         )
-        heuristic_warnings_remaining = any(after_warnings[rule] > 0 for rule in heuristic_warning_rules)
+        heuristic_warnings_remaining = any(
+            after_warnings[rule] > 0 for rule in heuristic_warning_rules
+        )
+
+        # 4. Spatial intelligence: high-confidence occlusion / peer-rail errors.
+        spatial_result = spatial.compare_presentations(args.source, args.output)
+        spatial_ok = bool(spatial_result["SPATIAL_QA_PASS"])
+        composition_review_required_by_structure = bool(
+            spatial_result["RENDER_COMPOSITION_REVIEW_REQUIRED"]
+        )
 
         structural_ok = (
             content_ok
@@ -90,10 +102,10 @@ def main() -> int:
             and no_error_regression
             and final_hard_errors_zero
             and blocking_warnings_not_worse
+            and spatial_ok
         )
 
-        # 4. Rendered visual QA. Schema requires per-slide source-theme fidelity,
-        # bilingual typography, placeholder cleanliness, readability, etc.
+        # 5. Existing rendered Visual QA (v0.4-compatible technical visual gate).
         visual_ok = False
         visual_errors: list[str] = []
         if args.visual_qa_report:
@@ -108,33 +120,79 @@ def main() -> int:
             except (OSError, json.JSONDecodeError) as exc:
                 visual_ok, visual_errors = False, [str(exc)]
         elif args.require_visual_qa:
-            visual_errors = ["--require-visual-qa was set but no --visual-qa-report was provided"]
+            visual_errors = [
+                "--require-visual-qa was set but no --visual-qa-report was provided"
+            ]
+
+        # 6. v0.5 Composition QA: rendered source-vs-final skeleton review.
+        composition_ok = False
+        composition_errors: list[str] = []
+        if args.composition_qa_report:
+            try:
+                with open(args.composition_qa_report, "r", encoding="utf-8") as f:
+                    report = json.load(f)
+                composition_ok, composition_errors = composition_gate.validate_report(
+                    report,
+                    output["slides_checked"],
+                    args.min_composition_dimension,
+                    args.min_composition_score,
+                )
+            except (OSError, json.JSONDecodeError) as exc:
+                composition_ok, composition_errors = False, [str(exc)]
+        elif args.require_composition_qa:
+            composition_errors = [
+                "--require-composition-qa was set but no --composition-qa-report was provided"
+            ]
 
         theme_fidelity_ok = theme_guard_ok and visual_ok
+
+        # Legacy-compatible fields. Existing consumers still work.
         regression_ok = structural_ok and (visual_ok if args.require_visual_qa else True)
         delivery_ok = structural_ok and visual_ok
+
+        # New strict v0.5 contract. This is the only fully-qualified delivery in v0.5.
+        regression_v05_ok = (
+            structural_ok
+            and visual_ok
+            and composition_ok
+            and (not args.require_visual_qa or visual_ok)
+            and (not args.require_composition_qa or composition_ok)
+        )
+        delivery_v05_ok = structural_ok and visual_ok and composition_ok
 
         result = {
             "REGRESSION_PASS": regression_ok,
             "DELIVERY_PASS": delivery_ok,
+            "REGRESSION_V05_PASS": regression_v05_ok,
+            "DELIVERY_V05_PASS": delivery_v05_ok,
             "CONTENT_LOCK_PASS": content_ok,
             "THEME_GUARD_PASS": theme_guard_ok,
             "THEME_FIDELITY_PASS": theme_fidelity_ok,
-            "LAYOUT_QA_PASS": final_hard_errors_zero and blocking_warnings_not_worse,
+            "SPATIAL_QA_PASS": spatial_ok,
+            "LAYOUT_QA_PASS": final_hard_errors_zero and blocking_warnings_not_worse and spatial_ok,
             "VISUAL_QA_PASS": visual_ok,
+            "COMPOSITION_QA_PASS": composition_ok,
             "VISUAL_QA_REQUIRED": (
                 args.require_visual_qa
                 or heuristic_warnings_remaining
                 or theme_result["THEME_REVIEW_REQUIRED"]
+            ),
+            "COMPOSITION_QA_REQUIRED": (
+                args.require_composition_qa
+                or composition_review_required_by_structure
+                or True
             ),
             "SOURCE_CANVAS_MODE": source_theme.get("canvas_mode", "unknown"),
             "OUTPUT_CANVAS_MODE": output_theme.get("canvas_mode", "unknown"),
             "theme_review_required": theme_result["THEME_REVIEW_REQUIRED"],
             "theme_violations": theme_result["violations"],
             "theme_warnings": theme_result["warnings"],
+            "spatial_errors": spatial_result["errors"],
+            "spatial_warnings": spatial_result["warnings"],
             "content_differences": len(content_diffs),
             "content_difference_preview": content_diffs[:100],
             "visual_qa_errors": visual_errors,
+            "composition_qa_errors": composition_errors,
             "baseline": {
                 "slides_checked": baseline["slides_checked"],
                 "lint_errors": baseline["lint_errors"],
@@ -155,6 +213,8 @@ def main() -> int:
                 "blocking_warnings_not_worse": blocking_warnings_not_worse,
                 "heuristic_warnings_remaining": heuristic_warnings_remaining,
                 "theme_guard_ok": theme_guard_ok,
+                "spatial_guard_ok": spatial_ok,
+                "composition_review_required_by_structure": composition_review_required_by_structure,
             },
         }
 
@@ -164,17 +224,24 @@ def main() -> int:
             for key in (
                 "REGRESSION_PASS",
                 "DELIVERY_PASS",
+                "REGRESSION_V05_PASS",
+                "DELIVERY_V05_PASS",
                 "CONTENT_LOCK_PASS",
                 "THEME_GUARD_PASS",
                 "THEME_FIDELITY_PASS",
+                "SPATIAL_QA_PASS",
                 "LAYOUT_QA_PASS",
                 "VISUAL_QA_PASS",
+                "COMPOSITION_QA_PASS",
                 "VISUAL_QA_REQUIRED",
+                "COMPOSITION_QA_REQUIRED",
             ):
                 print(f"{key}={'true' if result[key] else 'false'}")
             print(f"SOURCE_CANVAS_MODE={result['SOURCE_CANVAS_MODE']}")
             print(f"OUTPUT_CANVAS_MODE={result['OUTPUT_CANVAS_MODE']}")
             print(f"theme_violations={len(theme_result['violations'])}")
+            print(f"spatial_errors={spatial_result['error_count']}")
+            print(f"spatial_warnings={spatial_result['warning_count']}")
             print(f"content_differences={result['content_differences']}")
             print(f"baseline_layout_errors={baseline['lint_errors']}")
             print(f"output_layout_errors={output['lint_errors']}")
@@ -184,23 +251,48 @@ def main() -> int:
                 print("--- theme violations / 主色調違規 ---")
                 for item in theme_result["violations"]:
                     print(f"slide={item.get('slide')} rule={item['rule']} {item['message_zh_TW']}")
+            if spatial_result["errors"] or spatial_result["warnings"]:
+                print("--- spatial findings / 空間骨骼發現 ---")
+                for item in spatial_result["errors"] + spatial_result["warnings"]:
+                    print(f"{item['severity']}: slide={item['slide']} rule={item['rule']} {item['message_zh_TW']}")
             if visual_errors:
                 print("--- visual QA errors / 視覺 QA 錯誤 ---")
                 for item in visual_errors:
+                    print(item)
+            if composition_errors:
+                print("--- composition QA errors / 構圖 QA 錯誤 ---")
+                for item in composition_errors:
                     print(item)
             if content_diffs:
                 print("--- content differences / 內容差異 ---")
                 for item in content_diffs[:100]:
                     print(item)
 
-        return 0 if regression_ok else 2
+        # Legacy invocations keep their historic exit behavior. A v0.5 invocation
+        # opts into composition via --require-composition-qa and then fails closed.
+        final_ok = regression_v05_ok if args.require_composition_qa else regression_ok
+        return 0 if final_ok else 2
 
     except Exception as exc:
         if args.json:
-            print(json.dumps({"REGRESSION_PASS": False, "DELIVERY_PASS": False, "ERROR": str(exc)}, ensure_ascii=False, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "REGRESSION_PASS": False,
+                        "DELIVERY_PASS": False,
+                        "REGRESSION_V05_PASS": False,
+                        "DELIVERY_V05_PASS": False,
+                        "ERROR": str(exc),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
         else:
             print("REGRESSION_PASS=false")
             print("DELIVERY_PASS=false")
+            print("REGRESSION_V05_PASS=false")
+            print("DELIVERY_V05_PASS=false")
             print(f"ERROR={exc}", file=sys.stderr)
         return 3
 
