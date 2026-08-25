@@ -1,135 +1,111 @@
 ---
 name: pptx-beautify-lock
-description: "Beautify, repair, restyle, or auto-format an existing PPT/PPTX while preserving protected content and the source visual DNA. 既有 PowerPoint 需要美化、修排版、修重疊/overflow、統一繁中英文雙語字體或重新設計視覺，但文字/數據/圖片等內容不可變，且未授權時不得翻轉原主色調。Runs Content Lock → Source Theme Discovery → PPTX Linter → Auto Formatter → Design Agent → Render Visual QA → Regression Test."
+description: "Beautify, repair, restyle, or auto-format an existing PPT/PPTX while preserving protected content, source visual DNA, brand terrain, and spatial composition. 既有 PowerPoint 需要美化、修重疊/overflow、統一繁中英文雙語字體、重新設計視覺與版面骨骼，但文字/數據/圖片等內容不可變。Runs Content Lock → Theme Discovery → Linter → Auto Formatter → Layout Intelligence → Design Agent → Render Visual QA → Composition QA → Regression."
 license: MIT
 metadata:
-  version: "0.4.0"
+  version: "0.5.0"
   languages: "zh-TW,en"
   compatibility: "Claude Code, Codex, ChatGPT Skills, Agent-Skills-compatible coding agents"
 ---
 
-# PPTX Beautify Lock
+# PPTX Beautify Lock v0.5
 
-**繁體中文為主要說明語言；English is used for cross-agent compatibility.**
+**繁體中文為主要說明語言；English is retained for cross-agent compatibility.**
 
-## Leading contracts / 核心契約
+## Core contracts / 核心契約
 
 1. **Content Lock**：protected semantics immutable。
-2. **Theme Lock**：未經使用者明確授權，不得把來源 light/dark/mixed visual DNA 翻轉或 arbitrary rebrand。
-3. **Bilingual Typography**：繁體中文＋英文都必須 glyph-safe、協調、可讀。
+2. **Theme Lock**：未授權不得 arbitrary rebrand / light↔dark flip。
+3. **Bilingual Typography**：繁中＋英文 glyph-safe、協調、可讀。
+4. **Layout Intelligence**：不只禁止 overlap，還要保護 brand terrain、grid rails、spacing rhythm、reading order、visual balance、peer alignment。
 
-Content Lock 唯一定義：[`references/CONTENT_LOCK.md`](references/CONTENT_LOCK.md)。
+必讀：
 
-Theme / Typography：
+- `references/CONTENT_LOCK.md`
+- `references/THEME_DISCOVERY.md`
+- `references/TYPOGRAPHY_BILINGUAL.md`
+- `references/LAYOUT_INTELLIGENCE.md`
+- `references/DESIGN_AGENT_RULES.md`
+- `references/RENDER_VISUAL_QA.md`
 
-- [`references/THEME_DISCOVERY.md`](references/THEME_DISCOVERY.md)
-- [`references/TYPOGRAPHY_BILINGUAL.md`](references/TYPOGRAPHY_BILINGUAL.md)
+## Why v0.5 / 為什麼升級
 
-完整品質管線：
+v0.4 能攔截內容改動、主色翻轉、placeholder、基本 overlap 與 CJK fallback，但真實 MEC 壓測證明：**沒有幾何錯誤的 slide 仍可能構圖很怪。**
+
+v0.5 將 slide design 拆成：
+
+```text
+Soul → Frame → Skeleton → Joints → Limbs → Skin
+```
+
+先讀 source visual DNA 與品牌地形，再建立骨骼，最後才做表皮設計。
+
+## Full pipeline / 完整品質管線
 
 ```text
 SOURCE PPTX
   → Content Snapshot
-  → Source Theme Discovery / Visual DNA
+  → Source Theme Discovery
+  → Source Render + Slide-role / Brand-terrain discovery
   → PPTX Linter
   → Auto Formatter
+  → Layout Intelligence / Spatial QA
   → Design Agent
-  → Content + Theme Guard
+  → Content + Theme + Spatial Guards
   → Render Visual QA
-  → Regression Test
+  → Render Composition QA
+  → Regression v0.5
   → FINAL PPTX
 ```
 
----
+## 0. Preflight
 
-## 0. Preflight / 開工條件
+1. 能讀 source `.pptx`、寫 candidate、執行 scripts。
+2. 不覆寫 source。
+3. 若 source 有 animation/transition/hyperlink/OLE/SmartArt/comments/accessibility metadata，優先原檔就地修改視覺屬性。
+4. 無 renderer 時只能 structural candidate，不能宣稱 v0.5 fully qualified final。
 
-1. 確認能讀 source `.pptx`、寫新的 `.pptx`、執行 scripts。
-2. 不原地覆寫來源。
-3. 讀 `CONTENT_LOCK.md`、`THEME_DISCOVERY.md`、`TYPOGRAPHY_BILINGUAL.md`。
-4. 若來源有 animation/transition/hyperlink/OLE/SmartArt/comments/accessibility metadata，優先原檔就地修改視覺屬性。
-5. 無 renderer 時只能做 structural candidate，不得宣稱 fully qualified delivery。
-
----
-
-## 1. Content snapshot / 內容基準
+## 1. Content snapshot
 
 ```bash
 python scripts/pptx_content_lock.py snapshot source.pptx --out content_manifest.json
 ```
 
-**Gate:** snapshot 成功。
-
----
-
-## 2. Source Theme Discovery / 先找主色調，不先設計
-
-在任何 design decision 前：
+## 2. Source Theme Discovery
 
 ```bash
 python scripts/pptx_theme_profile.py profile source.pptx --out theme_profile.json
 ```
 
-必須辨識：
+必須同時看 source render。若品牌識別烘焙在 full-slide layout/master image，render 才是權威。
 
-- `light / dark / mixed / unknown` canvas
-- page-role pattern
-- theme/master/accent colors
-- large-area background/fill evidence
-- source explicit fonts / theme fonts
-- source content 是否偏 light technical / dark presentation / branded corporate 等
+## 3. Source Spatial Discovery
 
-若可 render，必須看**來源 render**校正 machine profile；不得只看首頁。
+逐頁辨識：
 
-### Default rule
+- slide role
+- brand chrome / footer / logo / department identity
+- content-safe / brand-safe zones
+- repeated rails
+- peer systems
+- reading order
+- vertical balance
 
-- 原本白底 → 保持 light
-- 原本 dark → 保持 dark
-- mixed → 保留各頁角色模式
-- 原已有主色 → 沿用 hue family
+不要把 cover、agenda、section、dense-data、closing 套成同一種模板。
 
-除非使用者明確要求換色系，**Beautify ≠ Rebrand**。
-
-**Gate:** `theme_profile.json` 已建立。
-
----
-
-## 3. PPTX Linter / 找出問題
-
-讀 [`references/LINTER_RULES.md`](references/LINTER_RULES.md)：
+## 4. Linter
 
 ```bash
 python scripts/pptx_lint.py source.pptx --json > lint.before.json
 ```
 
-必查：
+抓 geometry、placeholder、tiny text、table density、CJK fallback、suspicious overlap 等。
 
-- out-of-bounds / invalid geometry
-- overlap
-- template placeholder leakage
-- tiny text / dense tables
-- unsafe margins
-- title/font consistency
-- CJK/Latin fallback risk（能偵測時）
+## 5. Auto Formatter
 
-Linter 是 structural/heuristic；真正 overflow、美觀、theme fidelity、字體 fallback 仍以 render 為準。
+先修低風險機械問題：alignment、spacing、geometry、table sizing、text margins、chart plot area。
 
----
-
-## 4. Auto Formatter / 低風險機械修復
-
-讀 [`references/AUTO_FORMATTER_RULES.md`](references/AUTO_FORMATTER_RULES.md)。
-
-先修：grid、alignment、spacing、geometry、table sizing、text margins、chart plot area。
-
-不得：
-
-- 改內容
-- 翻轉來源主色調
-- 為科技感任意加入大面積 navy/black
-- 用 Latin-only font 承擔繁中 mixed text
-
-修改後立即：
+每次修改後：
 
 ```bash
 python scripts/pptx_content_lock.py verify source.pptx candidate.pptx
@@ -137,137 +113,157 @@ python scripts/pptx_theme_profile.py compare source.pptx candidate.pptx --json
 python scripts/pptx_lint.py candidate.pptx --json > lint.after-format.json
 ```
 
-**Gate:** Content Lock PASS；Theme Guard 無 blocking inversion；hard errors 不增加。
+## 6. Design Agent — Skeleton before Skin
 
----
-
-## 5. Design Agent / 視覺重構
-
-讀：
-
-- [`references/DESIGN_AGENT_RULES.md`](references/DESIGN_AGENT_RULES.md)
-- [`references/DESIGN_RULES.md`](references/DESIGN_RULES.md)
-
-目標：**source-faithful executive-ready redesign**。
-
-允許大幅改 composition、grid、cards、table/chart style、typography hierarchy，但：
-
-- Content Lock 永遠有效
-- Theme Lock 預設有效
-- 繁中＋英文都要安全漂亮
-- 真正內容優先於 generic placeholder
-- 保留 native editable objects
-
-### Repair loop
-
-最多 3 輪：
+依 `LAYOUT_INTELLIGENCE.md`：
 
 ```text
-design
-→ Content Lock verify
-→ Theme Guard compare
-→ render
-→ visual review
-→ repair
+Soul
+→ Frame
+→ Skeleton
+→ Joints
+→ Limbs
+→ Skin
 ```
 
----
+重點：
 
-## 6. Render Visual QA / 逐頁真的看
+- brand terrain 不被大面積 panel 壓住
+- title/status/logo 不互搶 header band
+- summary/table 共用合理 rails
+- L/R 或 A/B peer charts 共用尺寸、top/bottom rail、gutter
+- spacing 使用少數重複節奏
+- dense body 不無理由 top-heavy
+- decoration 必須服務 hierarchy/grouping/navigation/brand continuity
+- source `20260819` 不得為了美觀改成 `2026/08/19`
 
-讀 [`references/RENDER_VISUAL_QA.md`](references/RENDER_VISUAL_QA.md)。
+## 7. Spatial QA / 機器骨骼檢查
 
-Render 全部 source/final slides（來源能 render 時），產生 `visual_qa.json` schema 3。
+```bash
+python scripts/pptx_layout_intelligence.py source.pptx candidate.pptx --json
+```
 
-每頁必須包含：
+它會抓：
 
-- no unintended overlap
-- no clipping/overflow
-- content visible/readable
-- hierarchy/alignment/table/chart/style
-- no template placeholder artifacts
-- **theme_fidelity_preserved**
-- **bilingual_typography_clean**
+- foreground solid-fill occlusion
+- branded/full-bleed background 上新增加大型 solid region 的 review risk
+- peer visual rail/size drift
+- dense-data vertical-balance risk
+
+Hard requirement：
+
+```text
+SPATIAL_QA_PASS=true
+```
+
+Warnings 不等於 pass-through；它們必須在 Composition QA 被逐頁處理。
+
+## 8. Render Visual QA
+
+Render source + final 全頁，產生既有 `visual_qa.json` schema 3：
 
 ```bash
 python scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
 ```
 
-**Gate:** `VISUAL_QA_PASS=true`。
+必須：
 
----
+```text
+VISUAL_QA_PASS=true
+```
 
-## 7. Regression Test / 最終品質閘門
+## 9. Render Composition QA / v0.5 美感骨骼閘門
+
+另外產生 `composition_qa.json`，逐頁檢查：
+
+- brand chrome
+- occlusion
+- grid alignment
+- peer alignment
+- spacing rhythm
+- reading order
+- visual balance
+- slide-role fit
+- decorative restraint
+
+並提供 hierarchy/alignment/spacing/balance/brand/restraint/data-legibility 分數與 source-vs-final evidence。
+
+```bash
+python scripts/composition_qa_gate.py composition_qa.json --expected-slides <N>
+```
+
+必須：
+
+```text
+COMPOSITION_QA_PASS=true
+```
+
+## 10. Regression v0.5
 
 ```bash
 python scripts/pptx_regression.py source.pptx candidate.pptx \
-  --visual-qa-report visual_qa.json \
-  --require-visual-qa
+  --visual-qa-report visual_qa.json --require-visual-qa \
+  --composition-qa-report composition_qa.json --require-composition-qa
 ```
 
-Fully qualified final 只接受：
+Fully qualified v0.5 final **只接受**：
 
 ```text
 CONTENT_LOCK_PASS=true
 THEME_FIDELITY_PASS=true
+SPATIAL_QA_PASS=true
 LAYOUT_QA_PASS=true
 VISUAL_QA_PASS=true
-REGRESSION_PASS=true
-DELIVERY_PASS=true
+COMPOSITION_QA_PASS=true
+REGRESSION_V05_PASS=true
+DELIVERY_V05_PASS=true
 ```
 
-任何 false：candidate 不是 final。
+`DELIVERY_PASS=true` 僅為 v0.4 backward-compatibility field；v0.5 不得拿它當完成證明。
 
----
+## 11. Repair loop
 
-## 8. Fail closed / 保守失敗
+最多 3 輪：
 
-遇到 verifier 無法判定、theme confidence 低、重要物件遺失、font fallback 不可控、render 失敗或任何 Gate 未通過：
+```text
+design
+→ content/theme/spatial guards
+→ render all slides
+→ visual QA
+→ composition QA
+→ repair rails / spacing / balance / brand zones
+```
+
+第 3 輪仍有 blocking defect：fail closed。
+
+## 12. Fail closed
+
+遇到 verifier 無法判定、render 失敗、brand terrain 不清楚、font fallback 不可控、任何 v0.5 Gate 未通過：
 
 - 保留 source 與最近 Content-Lock-safe candidate
-- 明確回報失敗 Gate / slide
-- 不改內容、不刪內容、不換圖、不 flatten slide 來硬過關
+- 回報 slide number + failed gate
+- 不刪內容、不換圖、不 flatten、不假裝 final
 
----
-
-## 9. Agent autonomy / 自動化行為
-
-當使用者要求「既有 PPT 內容不變，只美化」：
-
-- 自動啟用本 Skill
-- 不逐頁詢問一般排版偏好
-- **先辨識來源主色調與字體，再開始設計**
-- 若沒有使用者 rebrand 指令，預設沿用 source visual DNA
-- 自動完成 Snapshot → Theme Discovery → Lint → Format → Design → Render QA → Regression
-
----
-
-## 10. Minimal activation / 最短指令
+## Minimal activation / 最短啟用語句
 
 ```text
-Use pptx-beautify-lock on this PPTX.
-啟用 Content Lock + Theme Lock。
-先辨識來源主色調與繁中/英文字體，再美化。
-自動執行 Theme Discovery → Linter → Auto Formatter → Design Agent → Render Visual QA → Regression Test。
-只有 DELIVERY_PASS=true 才交付 final PPTX。
+Use pptx-beautify-lock v0.5 on this PPTX.
+內容 100% 凍結，不 rebrand。
+先分析 Source Theme + Brand Terrain + Layout Skeleton，再美化。
+執行 Linter → Auto Formatter → Spatial QA → Design Agent → Render Visual QA → Composition QA → Regression v0.5。
+只有 DELIVERY_V05_PASS=true 才交付 final。
 ```
 
----
-
-## 11. Final report / 最終回報
+## Final report
 
 ```text
-OUTPUT=<path/to/final.pptx>
-SOURCE_CANVAS_MODE=light|dark|mixed|unknown
-OUTPUT_CANVAS_MODE=light|dark|mixed|unknown
+OUTPUT=<path>
 CONTENT_LOCK_PASS=true|false
 THEME_FIDELITY_PASS=true|false
+SPATIAL_QA_PASS=true|false
 LAYOUT_QA_PASS=true|false
 VISUAL_QA_PASS=true|false
-REGRESSION_PASS=true|false
-DELIVERY_PASS=true|false
-LINT_ERRORS=<N>
-LINT_WARNINGS=<N>
+COMPOSITION_QA_PASS=true|false
+REGRESSION_V05_PASS=true|false
+DELIVERY_V05_PASS=true|false
 ```
-
-不要只回覆「已美化完成」；每個品質 Gate 都是交付的一部分。
