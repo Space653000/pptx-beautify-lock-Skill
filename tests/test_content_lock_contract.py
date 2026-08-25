@@ -71,6 +71,32 @@ class ContentLockContractTests(unittest.TestCase):
 
             self.assert_content_passes(src, out)
 
+    def test_run_segmentation_change_passes_content_lock(self):
+        """Restyling tools may split one text run into several without changing text."""
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "one-run.pptx"
+            out = Path(td) / "two-runs.pptx"
+
+            prs = Presentation()
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(5), Inches(1))
+            paragraph = box.text_frame.paragraphs[0]
+            paragraph.add_run().text = "Hello world"
+            prs.save(src)
+
+            prs2 = Presentation(src)
+            paragraph2 = prs2.slides[0].shapes[0].text_frame.paragraphs[0]
+            paragraph2.clear()
+            r1 = paragraph2.add_run()
+            r1.text = "Hello "
+            r1.font.bold = True
+            r2 = paragraph2.add_run()
+            r2.text = "world"
+            r2.font.italic = True
+            prs2.save(out)
+
+            self.assert_content_passes(src, out)
+
     def test_text_change_fails_content_lock(self):
         with tempfile.TemporaryDirectory() as td:
             src = Path(td) / "src.pptx"
@@ -132,6 +158,33 @@ class ContentLockContractTests(unittest.TestCase):
             prs2 = Presentation(src)
             run2 = prs2.slides[0].shapes[0].text_frame.paragraphs[0].runs[0]
             run2.hyperlink.address = "https://example.com/b"
+            prs2.save(out)
+
+            self.assert_content_fails(src, out)
+
+    def test_swapping_hyperlinks_between_objects_fails_content_lock(self):
+        """The same global link set is not enough; links must remain with their objects."""
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "links-source.pptx"
+            out = Path(td) / "links-swapped.pptx"
+
+            prs = Presentation()
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            for index, (label, target) in enumerate((
+                ("Document A", "https://example.com/a"),
+                ("Document B", "https://example.com/b"),
+            )):
+                box = slide.shapes.add_textbox(Inches(1), Inches(1 + index), Inches(5), Inches(0.7))
+                run = box.text_frame.paragraphs[0].add_run()
+                run.text = label
+                run.hyperlink.address = target
+            prs.save(src)
+
+            prs2 = Presentation(src)
+            a_run = prs2.slides[0].shapes[0].text_frame.paragraphs[0].runs[0]
+            b_run = prs2.slides[0].shapes[1].text_frame.paragraphs[0].runs[0]
+            a_run.hyperlink.address = "https://example.com/b"
+            b_run.hyperlink.address = "https://example.com/a"
             prs2.save(out)
 
             self.assert_content_fails(src, out)
