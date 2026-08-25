@@ -2,9 +2,9 @@
 
 本 repo 同時提供：
 
-1. **Plugin marketplace 安裝**（最省事）
+1. **Plugin marketplace 安裝**
 2. **直接安裝 `pptx-beautify-lock/` Skill 目錄**
-3. **只貼 GitHub URL，由 Agent 讀取 `SKILL.md`**
+3. **只貼 GitHub URL，由 Agent bootstrap**
 
 ## Claude Code — Plugin marketplace
 
@@ -13,31 +13,28 @@ claude plugin marketplace add https://github.com/Space653000/pptx-beautify-lock-
 claude plugin install pptx-beautify-lock@space653000-pptx
 ```
 
-Claude Code 內也可以使用對應 `/plugin` 指令加入 marketplace 與安裝 plugin。
+## URL-only bootstrap / Claude Code + Codex 共用
 
-安裝後，當任務是既有 PPTX「內容不變，只美化/修版」時，model 應依 Skill description 自動選用 `pptx-beautify-lock`。
-
-## ChatGPT / Codex — Plugin marketplace
-
-若目前 Codex/ChatGPT harness 支援 plugin marketplace：
+Repository checkout 後：
 
 ```bash
-codex plugin marketplace add Space653000/pptx-beautify-lock-Skill
-codex
-/plugins
+# Claude Code
+python scripts/install_skill.py --target claude --force
+
+# Codex
+python scripts/install_skill.py --target codex --force
+
+# Both
+python scripts/install_skill.py --target both --force
 ```
 
-選擇 `space653000-pptx` marketplace，安裝 `pptx-beautify-lock`。
-
-## Editable Skill files / 直接安裝 Skill
-
-真正的 Skill 目錄：
+成功：
 
 ```text
-pptx-beautify-lock/
+INSTALL_PASS=true
 ```
 
-Typical local patterns：
+Typical local targets：
 
 ```text
 ~/.claude/skills/pptx-beautify-lock/
@@ -46,9 +43,7 @@ Typical local patterns：
 
 若宿主版本的 Skills 路徑不同，以該版本支援的 Agent Skills 安裝機制為準。
 
-也可以只維護一份 shared source，再對 Claude Code/Codex 建 symbolic link 或 Windows junction，避免規範分叉。
-
-## 只貼 URL / URL-only bootstrap
+## 只貼 URL / URL-only use
 
 把 PPTX 給 AI 並貼：
 
@@ -59,10 +54,10 @@ https://github.com/Space653000/pptx-beautify-lock-Skill
 然後說：
 
 ```text
-Read this repository and use pptx-beautify-lock/SKILL.md on this PPTX.
-啟用 Content Lock + Theme Lock + Layout Intelligence。
-先分析 Source Theme、Brand Terrain、Slide Role 與 Layout Skeleton，再美化。
-只有 DELIVERY_V05_PASS=true 才交付 final PPTX。
+Use pptx-beautify-lock v0.6 Global Design Jury on this PPTX.
+內容 100% 凍結，不 rebrand、不套通用模板。
+先分析 Source Theme + Brand Terrain + Deck Identity + Layout Skeleton，再美化。
+只有 DELIVERY_V06_PASS=true 才交付 final PPTX。
 ```
 
 根目錄入口：
@@ -73,24 +68,25 @@ Read this repository and use pptx-beautify-lock/SKILL.md on this PPTX.
 
 ## Python dependencies
 
-驗證/Linter scripts 需要：
-
 ```bash
 pip install -r requirements.txt
 ```
 
-v0.5 完整品質流程除了 Python scripts，還需要宿主本身具備 PPTX 編輯與 render 能力。若無 render 能力，依 `SKILL.md` 只能產生 structural candidate，不能宣稱完整 final。
+完整品質流程還需要宿主具備 PPTX 編輯與 render 能力。無 renderer 只能產生 structural candidate，不能宣稱 v0.6 final。
 
-Fully qualified v0.5 final 必須至少：
+## v0.6 required finish line
 
 ```text
 CONTENT_LOCK_PASS=true
 THEME_FIDELITY_PASS=true
 SPATIAL_QA_PASS=true
+LAYOUT_QA_PASS=true
 VISUAL_QA_PASS=true
 COMPOSITION_QA_PASS=true
-REGRESSION_V05_PASS=true
-DELIVERY_V05_PASS=true
+DECK_IDENTITY_PASS=true
+GLOBAL_DESIGN_JURY_PASS=true
+REGRESSION_V06_PASS=true
+DELIVERY_V06_PASS=true
 ```
 
-`DELIVERY_PASS=true` 是舊版相容欄位，不是 v0.5 完成條件。
+`DELIVERY_PASS=true` / `DELIVERY_V05_PASS=true` 是舊版相容欄位，不是 v0.6 完成條件。
