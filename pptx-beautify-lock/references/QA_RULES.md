@@ -1,87 +1,74 @@
-# QA RULES / 品質驗證規範
+# QA Rules / 品質驗證規範
 
-## 交付門檻 / Delivery gate
+本文件定義「什麼才算可以交付」。Content Lock 的 protected semantics 仍以 [`CONTENT_LOCK.md`](CONTENT_LOCK.md) 為唯一權威來源。
 
-最終檔必須同時通過：
+## Delivery gate / 交付門檻
 
-1. **Content QA / 內容驗證**
-2. **Layout QA / 幾何版面驗證**
-3. **Visual QA / Render 後視覺驗證**
+完整 final PPTX 必須同時通過：
 
-缺一不可；若環境缺少 render 能力，必須明確說明該限制，不得假裝已完成視覺驗證。
+1. **Content QA** — protected semantics 無未授權變更
+2. **Layout QA** — structural hard errors 為 0，blocking readability warnings 不退化
+3. **Visual QA** — render 後逐頁檢查全部通過
+4. **Regression QA** — source-vs-output 綜合回歸通過
 
-## 1. Content QA / 內容驗證
+正式交付結果：
 
-Run:
+```text
+CONTENT_LOCK_PASS=true
+LAYOUT_QA_PASS=true
+VISUAL_QA_PASS=true
+REGRESSION_PASS=true
+DELIVERY_PASS=true
+```
+
+## Content QA
 
 ```bash
 python scripts/pptx_content_lock.py verify source.pptx output.pptx
 ```
 
-Mandatory result:
+任何 semantic diff 都必須先修正。
 
-```text
-CONTENT_LOCK_PASS=true
-```
+## Layout QA
 
-任何差異都必須先修正。
-
-## 2. Layout QA / 版面驗證
-
-Run:
+主要 linter：
 
 ```bash
-python scripts/verify_layout.py output.pptx
+python scripts/pptx_lint.py output.pptx --json
 ```
 
-必查：
+`verify_layout.py` 僅保留為舊版相容入口；新工作流以 `pptx_lint.py` 為 structural findings 的 single source of truth。
 
-- shapes outside slide boundary / 物件超出投影片
-- suspicious unintended overlaps / 疑似非預期重疊
-- zero/negative geometry / 異常尺寸
-- extremely small text / 過小文字
+Hard errors 包含 out-of-bounds / invalid geometry。Warnings 是 heuristic，其中 tiny text 與 table density 會作為 regression 的 blocking readability signals；suspicious overlap 等需要 render 判定。
 
-注意：程式只能找「疑似」問題。合法的背景、裝飾、群組或疊圖可能產生 false positive，因此仍需 visual QA。
+## Visual QA
 
-## 3. Visual QA / 視覺驗證
+詳細規範：[`RENDER_VISUAL_QA.md`](RENDER_VISUAL_QA.md)。
 
-如果環境能 render PPTX，必須 render 全部頁面並逐頁檢查。
+必須 render 全部投影片並產生 `visual_qa.json`，然後：
 
-Score target:
+```bash
+python scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
+```
 
-| Metric | Target |
-|---|---:|
-| Content fidelity | 100% |
-| Unintended overflow | 0 |
-| Unintended clipping | 0 |
-| Out-of-bounds objects | 0 |
-| Alignment | >= 95/100 |
-| Typography | >= 90/100 |
-| Spacing | >= 90/100 |
-| Visual hierarchy | >= 90/100 |
-| Table readability | >= 90/100 |
-| Cross-slide consistency | >= 90/100 |
-| Overall design quality | >= 90/100 |
+預設每頁 visual score >= 85，而且每頁八個 required boolean checks 必須全部為 true。
 
-## Repair loop / 自動修復循環
+## Regression QA
 
-建議最多 3 輪：
+```bash
+python scripts/pptx_regression.py source.pptx output.pptx \
+  --visual-qa-report visual_qa.json \
+  --require-visual-qa
+```
+
+Regression 不會單純用 warning 總數判斷設計好壞；真正的視覺 heuristic 由 render QA adjudicate，避免把刻意的設計疊圖誤判成 regression。
+
+## Repair loop
+
+最多 3 輪：
 
 ```text
-redesign → render → inspect → repair → verify content
+repair → content verify → lint → render → visual review
 ```
 
-若 3 輪後仍無法達標，保留內容鎖定，回報剩餘視覺風險，不得用改內容換取通過。
-
-## Final report / 最終報告
-
-建議至少輸出：
-
-```text
-CONTENT_LOCK_PASS=true|false
-LAYOUT_QA_PASS=true|false
-VISUAL_QA_PASS=true|false|unavailable
-slides_checked=N
-content_differences=N
-layout_warnings=N
-```
+每輪修改後都重新驗證 Content Lock。三輪後仍有 blocking defect，就回報未解問題並停止；Content Lock 不因美觀目標而放寬。
