@@ -1,7 +1,7 @@
 {
   "name": "pptx-beautify-lock",
-  "version": "0.5.0",
-  "description": "Source-faithful PowerPoint beautification with hard Content Lock, Theme Discovery/Guard, Traditional Chinese + English typography, Layout Intelligence, Spatial QA, Design Agent, rendered Visual QA, strict Composition QA, and Regression v0.5.",
+  "version": "0.6.0",
+  "description": "Source-faithful PowerPoint beautification with hard Content Lock, Theme Discovery/Guard, Traditional Chinese + English typography, Layout Intelligence, Spatial QA, rendered Visual QA, Composition QA, Deck Identity Guard, Global Design Jury, and Regression v0.6.",
   "author": {
     "name": "Space653000",
     "url": "https://github.com/Space653000"
@@ -19,6 +19,9 @@
     "layout-intelligence",
     "spatial-qa",
     "composition-qa",
+    "global-design-jury",
+    "deck-identity",
+    "world-class-presentations",
     "traditional-chinese",
     "bilingual-typography",
     "claude-code",
