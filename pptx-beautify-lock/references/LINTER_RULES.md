@@ -17,6 +17,29 @@ The linter detects measurable layout and consistency defects. It must not rewrit
 - 重要物件離頁面安全邊界過近 / unsafe edge margins
 - 同頁同類物件對齊誤差過大 / alignment drift
 
+### Template placeholders / 母片與預設 placeholder 洩漏
+Final deck **不得顯示模板提示文字或預設示意欄位**。這類文字不是用來取代真正內容，也不能與真正標題/副標/正文競爭視覺層級。
+
+High-confidence template-artifact examples include exact or normalized forms of:
+
+- `presentation title`
+- `presentation subtitle`
+- `click to add title`
+- `click to add subtitle`
+- `click to add text`
+- `click to add content`
+- `title placeholder`
+- `subtitle placeholder`
+
+Mandatory behavior:
+
+- 若 generic template text 位於 PowerPoint placeholder 中，標記 `ERROR template-placeholder-artifact`。
+- 若 generic template text 與任何真正可見內容重疊，標記 `ERROR template-artifact-overlap`。
+- 若 generic template text 出現在普通文字框且無法確定是否為使用者內容，至少標記 `WARNING generic-template-text`，交由 Render Visual QA 判定；不得擅自刪除使用者可能刻意保留的文字。
+- 首頁/章節頁若已存在真正主標題，不得同時顯示 generic title placeholder。
+- 修正時**保留真正內容**；優先停用/避開 template placeholder、改用 blank layout、調整 layout assignment 或其他視覺層方案。不要刪掉真正標題來消除重疊。
+- 不得修改/刪除 master/layout 中受 Content Lock 保護的模板語意來「硬修」；應避免其被實際 render 到 final slide。
+
 ### Typography / 字體
 - 過小字級 / tiny text
 - 同一頁使用過多字型 / too many font families per slide
@@ -43,7 +66,7 @@ The linter detects measurable layout and consistency defects. It must not rewrit
 
 ## Severity / 嚴重度
 
-- `ERROR`: 可能造成內容不可見、裁切、超出頁面或明顯錯誤。不得交付。
+- `ERROR`: 可能造成內容不可見、裁切、超出頁面、模板 placeholder 洩漏或明顯錯誤。不得交付。
 - `WARNING`: 高機率影響可讀性或視覺品質，需由 Auto Formatter / Design Agent 處理。
 - `INFO`: 可改善但不阻擋交付。
 
@@ -52,6 +75,7 @@ The linter detects measurable layout and consistency defects. It must not rewrit
 - 不得改寫、刪除、摘要、翻譯內容。
 - 不得把長文字判定為「應縮短」。只能判定為 `fit risk`。
 - 不得因為重疊就直接刪除其中一個物件。
+- 不得因為 generic placeholder 與真正內容重疊，就刪掉真正內容。
 - 不得把整頁轉為圖片來規避排版問題。
 
 ## 輸出契約 / Output contract
