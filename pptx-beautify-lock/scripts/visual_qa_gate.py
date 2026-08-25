@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
-"""Validate a rendered-slide visual QA report for pptx-beautify-lock.
-
-The report is produced after an AI/human reviewer inspects every rendered slide.
-This validator does not perform vision itself; it makes the review exhaustive,
-machine-readable, and suitable for the final regression gate.
-"""
+"""Validate a rendered-slide visual QA report for pptx-beautify-lock."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 
-VISUAL_QA_SCHEMA = 2
+VISUAL_QA_SCHEMA = 3
 
 REQUIRED_CHECKS = (
     "no_unintended_overlap",
@@ -24,6 +18,8 @@ REQUIRED_CHECKS = (
     "tables_charts_readable",
     "style_consistent",
     "no_template_placeholder_artifacts",
+    "theme_fidelity_preserved",
+    "bilingual_typography_clean",
 )
 
 
@@ -34,9 +30,7 @@ def validate_report(report: dict, expected_slides: int, min_score: float = 85.0)
         errors.append(f"schema must be {VISUAL_QA_SCHEMA}")
 
     if report.get("slide_count") != expected_slides:
-        errors.append(
-            f"slide_count {report.get('slide_count')!r} != expected {expected_slides}"
-        )
+        errors.append(f"slide_count {report.get('slide_count')!r} != expected {expected_slides}")
 
     if not str(report.get("render_engine", "")).strip():
         errors.append("render_engine is required")
