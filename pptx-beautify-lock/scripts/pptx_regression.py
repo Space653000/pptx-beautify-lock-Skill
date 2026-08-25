@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Regression quality gate for pptx-beautify-lock.
 
-v0.5 keeps the v0.4 delivery fields for compatibility and adds a stricter
-v0.5 contract that requires spatial structure plus rendered composition QA.
+v0.6 preserves legacy v0.4/v0.5 fields while adding a strict world-class
+Global Design Jury contract. A v0.6 final requires content/theme/spatial
+integrity, rendered visual/composition QA, deck identity preservation, and the
+Global Design Jury.
 """
 
 from __future__ import annotations
@@ -47,6 +49,16 @@ def main() -> int:
     ap.add_argument("--require-composition-qa", action="store_true")
     ap.add_argument("--min-composition-dimension", type=float, default=88.0)
     ap.add_argument("--min-composition-score", type=float, default=90.0)
+    ap.add_argument("--global-jury-report", help="global_design_jury.json created after v0.6 world-class review")
+    ap.add_argument("--require-global-jury", action="store_true")
+    ap.add_argument("--min-jury-dimension", type=float, default=90.0)
+    ap.add_argument("--min-jury-slide-overall", type=float, default=93.0)
+    ap.add_argument("--min-jury-role-dimension", type=float, default=90.0)
+    ap.add_argument("--min-jury-role-overall", type=float, default=92.0)
+    ap.add_argument("--min-identity-score", type=float, default=95.0)
+    ap.add_argument("--min-archetype-fit", type=float, default=92.0)
+    ap.add_argument("--max-generic-template-risk", type=float, default=10.0)
+    ap.add_argument("--min-jury-deck-overall", type=float, default=93.0)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -57,6 +69,7 @@ def main() -> int:
         spatial = _load("pptx_layout_intelligence", "pptx_layout_intelligence.py")
         visual_gate = _load("visual_qa_gate", "visual_qa_gate.py")
         composition_gate = _load("composition_qa_gate", "composition_qa_gate.py")
+        jury_gate = _load("global_design_jury_gate", "global_design_jury_gate.py")
 
         # 1. Protected content semantics.
         before_manifest = lock.build_manifest(args.source)
@@ -105,7 +118,7 @@ def main() -> int:
             and spatial_ok
         )
 
-        # 5. Existing rendered Visual QA (v0.4-compatible technical visual gate).
+        # 5. Rendered Visual QA.
         visual_ok = False
         visual_errors: list[str] = []
         if args.visual_qa_report:
@@ -124,7 +137,7 @@ def main() -> int:
                 "--require-visual-qa was set but no --visual-qa-report was provided"
             ]
 
-        # 6. v0.5 Composition QA: rendered source-vs-final skeleton review.
+        # 6. v0.5 Composition QA.
         composition_ok = False
         composition_errors: list[str] = []
         if args.composition_qa_report:
@@ -144,21 +157,58 @@ def main() -> int:
                 "--require-composition-qa was set but no --composition-qa-report was provided"
             ]
 
+        # 7. v0.6 Global Design Jury + Deck Identity Guard.
+        jury_ok = False
+        identity_ok = False
+        jury_errors: list[str] = []
+        if args.global_jury_report:
+            try:
+                with open(args.global_jury_report, "r", encoding="utf-8") as f:
+                    report = json.load(f)
+                jury_ok, identity_ok, jury_errors = jury_gate.validate_report(
+                    report,
+                    output["slides_checked"],
+                    args.min_jury_dimension,
+                    args.min_jury_slide_overall,
+                    args.min_jury_role_dimension,
+                    args.min_jury_role_overall,
+                    args.min_identity_score,
+                    args.min_archetype_fit,
+                    args.max_generic_template_risk,
+                    args.min_jury_deck_overall,
+                )
+            except (OSError, json.JSONDecodeError) as exc:
+                jury_ok, identity_ok, jury_errors = False, False, [str(exc)]
+        elif args.require_global_jury:
+            jury_errors = [
+                "--require-global-jury was set but no --global-jury-report was provided"
+            ]
+
         theme_fidelity_ok = theme_guard_ok and visual_ok
 
-        # Legacy-compatible fields. Existing consumers still work.
+        # Backward-compatible contracts.
         regression_ok = structural_ok and (visual_ok if args.require_visual_qa else True)
         delivery_ok = structural_ok and visual_ok
-
-        # New strict v0.5 contract. This is the only fully-qualified delivery in v0.5.
         regression_v05_ok = structural_ok and visual_ok and composition_ok
         delivery_v05_ok = structural_ok and visual_ok and composition_ok
+
+        # Strict v0.6 contract.
+        regression_v06_ok = (
+            structural_ok
+            and visual_ok
+            and composition_ok
+            and identity_ok
+            and jury_ok
+        )
+        delivery_v06_ok = regression_v06_ok
 
         result = {
             "REGRESSION_PASS": regression_ok,
             "DELIVERY_PASS": delivery_ok,
             "REGRESSION_V05_PASS": regression_v05_ok,
             "DELIVERY_V05_PASS": delivery_v05_ok,
+            "REGRESSION_V06_PASS": regression_v06_ok,
+            "DELIVERY_V06_PASS": delivery_v06_ok,
             "CONTENT_LOCK_PASS": content_ok,
             "THEME_GUARD_PASS": theme_guard_ok,
             "THEME_FIDELITY_PASS": theme_fidelity_ok,
@@ -166,13 +216,15 @@ def main() -> int:
             "LAYOUT_QA_PASS": final_hard_errors_zero and blocking_warnings_not_worse and spatial_ok,
             "VISUAL_QA_PASS": visual_ok,
             "COMPOSITION_QA_PASS": composition_ok,
+            "DECK_IDENTITY_PASS": identity_ok,
+            "GLOBAL_DESIGN_JURY_PASS": jury_ok,
             "VISUAL_QA_REQUIRED": (
                 args.require_visual_qa
                 or heuristic_warnings_remaining
                 or theme_result["THEME_REVIEW_REQUIRED"]
             ),
-            # v0.5 always requires rendered Composition QA for a qualified final.
             "COMPOSITION_QA_REQUIRED": True,
+            "GLOBAL_DESIGN_JURY_REQUIRED": True,
             "SOURCE_CANVAS_MODE": source_theme.get("canvas_mode", "unknown"),
             "OUTPUT_CANVAS_MODE": output_theme.get("canvas_mode", "unknown"),
             "theme_review_required": theme_result["THEME_REVIEW_REQUIRED"],
@@ -184,6 +236,7 @@ def main() -> int:
             "content_difference_preview": content_diffs[:100],
             "visual_qa_errors": visual_errors,
             "composition_qa_errors": composition_errors,
+            "global_jury_errors": jury_errors,
             "baseline": {
                 "slides_checked": baseline["slides_checked"],
                 "lint_errors": baseline["lint_errors"],
@@ -206,6 +259,8 @@ def main() -> int:
                 "theme_guard_ok": theme_guard_ok,
                 "spatial_guard_ok": spatial_ok,
                 "composition_review_required_by_structure": composition_review_required_by_structure,
+                "deck_identity_ok": identity_ok,
+                "global_design_jury_ok": jury_ok,
             },
         }
 
@@ -217,6 +272,8 @@ def main() -> int:
                 "DELIVERY_PASS",
                 "REGRESSION_V05_PASS",
                 "DELIVERY_V05_PASS",
+                "REGRESSION_V06_PASS",
+                "DELIVERY_V06_PASS",
                 "CONTENT_LOCK_PASS",
                 "THEME_GUARD_PASS",
                 "THEME_FIDELITY_PASS",
@@ -224,8 +281,11 @@ def main() -> int:
                 "LAYOUT_QA_PASS",
                 "VISUAL_QA_PASS",
                 "COMPOSITION_QA_PASS",
+                "DECK_IDENTITY_PASS",
+                "GLOBAL_DESIGN_JURY_PASS",
                 "VISUAL_QA_REQUIRED",
                 "COMPOSITION_QA_REQUIRED",
+                "GLOBAL_DESIGN_JURY_REQUIRED",
             ):
                 print(f"{key}={'true' if result[key] else 'false'}")
             print(f"SOURCE_CANVAS_MODE={result['SOURCE_CANVAS_MODE']}")
@@ -254,14 +314,22 @@ def main() -> int:
                 print("--- composition QA errors / 構圖 QA 錯誤 ---")
                 for item in composition_errors:
                     print(item)
+            if jury_errors:
+                print("--- global design jury errors / 世界級評審錯誤 ---")
+                for item in jury_errors:
+                    print(item)
             if content_diffs:
                 print("--- content differences / 內容差異 ---")
                 for item in content_diffs[:100]:
                     print(item)
 
-        # Legacy invocations keep their historic exit behavior. A v0.5 invocation
-        # opts into composition via --require-composition-qa and then fails closed.
-        final_ok = regression_v05_ok if args.require_composition_qa else regression_ok
+        # Preserve old CLI semantics; opt into stricter gates explicitly.
+        if args.require_global_jury:
+            final_ok = regression_v06_ok
+        elif args.require_composition_qa:
+            final_ok = regression_v05_ok
+        else:
+            final_ok = regression_ok
         return 0 if final_ok else 2
 
     except Exception as exc:
@@ -273,6 +341,8 @@ def main() -> int:
                         "DELIVERY_PASS": False,
                         "REGRESSION_V05_PASS": False,
                         "DELIVERY_V05_PASS": False,
+                        "REGRESSION_V06_PASS": False,
+                        "DELIVERY_V06_PASS": False,
                         "ERROR": str(exc),
                     },
                     ensure_ascii=False,
@@ -284,6 +354,8 @@ def main() -> int:
             print("DELIVERY_PASS=false")
             print("REGRESSION_V05_PASS=false")
             print("DELIVERY_V05_PASS=false")
+            print("REGRESSION_V06_PASS=false")
+            print("DELIVERY_V06_PASS=false")
             print(f"ERROR={exc}", file=sys.stderr)
         return 3
 
