@@ -8,65 +8,85 @@ This reference defines the rendered-slide review required before a fully qualifi
 
 當環境具備任何 PPTX render 能力時，Design Agent 完成後必須讀本文件並執行完整 Visual QA。
 
+同時必讀：
+
+- [`THEME_DISCOVERY.md`](THEME_DISCOVERY.md)
+- [`TYPOGRAPHY_BILINGUAL.md`](TYPOGRAPHY_BILINGUAL.md)
+
 ## Render 優先順序 / Render preference
 
-使用環境中已存在且可信任的 renderer；不要為了遵守名稱而改用較差的工具。
-
-1. **Microsoft PowerPoint native render**（Windows/Office automation，可用時優先，最接近最終播放）
-2. **宿主既有的 PowerPoint/Slides renderer**（例如 agent harness 已提供的 render/thumbnail 工具）
-3. **LibreOffice headless** 或其他可重現的 PPTX renderer
+1. Microsoft PowerPoint native render
+2. 宿主既有 PowerPoint/Slides renderer
+3. LibreOffice headless 或其他可信 renderer
 
 必須 render **全部投影片**，不能只抽查首頁或問題頁。
 
-## Source-vs-final visual intent / 原始頁與完成頁對照
+## Source-vs-final comparison / 來源與完成版對照
 
-若來源可 render，首頁、章節頁與任何使用 template/master/layout 的頁面，至少要對照來源 render 與 final render。
+若來源可 render，應同時 render source 與 final，至少逐頁確認：
 
-目的不是要求版面相同，而是避免 final 新增來源沒有的模板提示、placeholder、sample text 或其他 presentation chrome。
+- final 仍是 source 的升級版，而不是無授權 rebrand
+- light/dark/mixed canvas pattern 未被翻轉
+- 真正主標題/副標仍完整可見
+- generic placeholder/sample text 沒有洩漏
+- 繁中與英文都使用穩定、協調的 glyph/font rendering
 
-尤其要檢查：
-
-- 真正主標題/副標是否仍完整可見
-- 是否出現 `presentation title`、`click to add title`、`subtitle placeholder` 等 generic template text
-- 是否因換 layout/master 而讓原本不顯示的 placeholder 突然被 render
-- 修正重疊時是否錯刪真正內容，留下模板文字
+對 title/section/data pages 不得只看首頁判斷整份 theme。
 
 ## Visual QA 每頁必查 / Required checks per slide
 
-每一頁都必須明確判定以下九項：
+每一頁都必須明確判定以下十一項：
 
-- `no_unintended_overlap`：沒有非刻意物件/文字重疊
-- `no_clipping_or_overflow`：沒有文字、表格、圖表被裁切或溢出
-- `content_visible`：來源內容沒有因層級、透明度、遮罩、z-order 而看不到
-- `text_readable`：投影/螢幕閱讀尺寸合理
-- `hierarchy_clear`：標題、重點、正文、次要資訊有清楚層級
-- `alignment_consistent`：對齊、邊界、grid 不凌亂
-- `tables_charts_readable`：表格與圖表標籤、欄列、legend/axis 清楚
-- `style_consistent`：與整份 deck 的字體、色彩、spacing、元件語言一致
-- `no_template_placeholder_artifacts`：沒有 generic placeholder、template prompt、sample title/subtitle、未預期母片示意文字或其與真正內容的重疊
+- `no_unintended_overlap`
+- `no_clipping_or_overflow`
+- `content_visible`
+- `text_readable`
+- `hierarchy_clear`
+- `alignment_consistent`
+- `tables_charts_readable`
+- `style_consistent`
+- `no_template_placeholder_artifacts`
+- `theme_fidelity_preserved`
+- `bilingual_typography_clean`
 
-### `no_template_placeholder_artifacts` 必須判定 false 的例子
+### `no_template_placeholder_artifacts=false` examples
 
-- 真正標題存在，但下方仍顯示 `presentation title`
-- `Click to add title` / `Click to add subtitle` 被 render 出來
-- template subtitle/sample text 與真正副標重疊
-- master/layout placeholder 因重構而突然出現在 final
-- 為消除 overlap 而刪掉真正內容、只留下 placeholder
+- 真正標題存在，但仍顯示 `presentation title`
+- `Click to add title` / `Click to add subtitle` 被 render
+- template sample text 與真正內容重疊
+- 修 overlap 時錯刪真正內容，只留下 placeholder
 
-這類缺陷即使其他八項都通過，也**不得交付**。
+### `theme_fidelity_preserved=false` examples
+
+- source 白底/light technical deck，被改成大面積深藍/黑底
+- source dark deck 被改成 white corporate deck
+- source 原有品牌 hue 被無關的新主色取代
+- source 的 semantic red/green 被誤當成整份 deck brand color
+- source 是 mixed page-role system，但 final 把所有頁強制統一成單一 dark/light canvas
+
+### `bilingual_typography_clean=false` examples
+
+- 繁中缺字、tofu、□
+- 英文好看但繁中掉成不可控 fallback 字體
+- 同一標題中英文 baseline/weight 明顯不協調
+- mixed CJK/Latin run 套 Latin-only font，造成字體跳動
+- `% / σ / Hz / dB / 負號 / 數字` 等技術符號 render 異常
+- fallback 導致 clipping/overflow
+
+任何一項 false，都不得 final delivery。
 
 ## 分數 / Score
 
-每頁給 `0–100` 的視覺品質分數。預設交付門檻：**每頁 >= 85**。
+每頁給 `0–100` 視覺品質分數。預設門檻：**每頁 >= 85**。
 
-分數只是輔助；九個 boolean checks **全部必須為 true**，不能用高分抵銷 clipping、unreadable text 或 template-artifact leakage。
+分數不可抵銷任何 boolean defect。
 
-## visual_qa.json 格式
+## visual_qa.json schema 3
 
 ```json
 {
-  "schema": 2,
-  "slide_count": 2,
+  "schema": 3,
+  "slide_count": 1,
   "render_engine": "Microsoft PowerPoint",
   "reviewer": "AI vision reviewer",
   "overall_pass": true,
@@ -83,7 +103,9 @@ This reference defines the rendered-slide review required before a fully qualifi
         "alignment_consistent": true,
         "tables_charts_readable": true,
         "style_consistent": true,
-        "no_template_placeholder_artifacts": true
+        "no_template_placeholder_artifacts": true,
+        "theme_fidelity_preserved": true,
+        "bilingual_typography_clean": true
       },
       "notes": ""
     }
@@ -97,7 +119,7 @@ This reference defines the rendered-slide review required before a fully qualifi
 python scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
 ```
 
-必須得到：
+必須：
 
 ```text
 VISUAL_QA_PASS=true
@@ -108,31 +130,49 @@ VISUAL_QA_PASS=true
 最多自動跑 3 輪：
 
 ```text
-render → review every slide → repair visual defects → content verify → render again
+source render/profile
+→ final render
+→ review every slide
+→ repair
+→ Content Lock verify
+→ Theme Guard compare
+→ render again
 ```
 
-每一輪修改後都要重新執行 Content Lock verification；不能假設視覺修復不會碰到內容。
+### Theme repair priority / 色系修復
 
-### Placeholder repair priority / Placeholder 修復優先序
+若 source light、candidate dark：
 
-當 generic template placeholder 與真正內容衝突時：
+1. 保留所有真正內容。
+2. 回到 source canvas polarity。
+3. 從 source theme/accent 建立較精緻的 tint/shade，而不是選新主色。
+4. 再 render source/final 對照。
+5. 再跑 Content Lock + Theme Guard。
+
+### Placeholder repair priority / Placeholder 修復
 
 1. 保留真正來源內容。
-2. 不修改 master/layout 的 protected semantics。
-3. 優先改用 blank/content-safe layout、取消 placeholder 實例化、改 layout assignment、調整 z-order/visibility 或其他只影響視覺呈現的方法。
-4. 重新 render 確認 placeholder 不再出現。
-5. 再跑 Content Lock；任何 protected semantic 差異都必須回復。
+2. 不修改受保護 master/layout semantics。
+3. 優先使用 content-safe layout / placeholder instance handling。
+4. render 確認 artifact 消失。
+5. 再跑 Content Lock。
 
-若第 3 輪仍有 blocking visual defect：
+### Typography repair priority / 字體修復
 
-- 保留 CONTENT LOCK
+1. 確認目標平台實際存在的 CJK-safe font。
+2. mixed CJK/Latin 優先改回單一 bilingual-safe family。
+3. 若使用中英分字族，只對 pure-Latin run 套 Latin font。
+4. render 檢查繁中、英文、數字與技術符號。
+5. 再跑 Content Lock。
+
+若第 3 輪仍有 blocking defect：
+
+- 保留 Content Lock
 - `VISUAL_QA_PASS=false`
-- 不得宣稱 fully qualified delivery
-- 回報仍未解決的頁碼與原因
+- 不得 fully qualified delivery
+- 回報未解決頁碼與原因
 
 ## Final regression command
-
-完整品質交付建議使用：
 
 ```bash
 python scripts/pptx_regression.py source.pptx output.pptx \
@@ -140,14 +180,13 @@ python scripts/pptx_regression.py source.pptx output.pptx \
   --require-visual-qa
 ```
 
-只有同時得到：
+Fully qualified final 必須同時：
 
 ```text
 CONTENT_LOCK_PASS=true
+THEME_FIDELITY_PASS=true
 LAYOUT_QA_PASS=true
 VISUAL_QA_PASS=true
 REGRESSION_PASS=true
 DELIVERY_PASS=true
 ```
-
-才可以宣稱內容鎖定且視覺品質已完整驗證。
