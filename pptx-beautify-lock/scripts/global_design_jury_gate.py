@@ -166,6 +166,7 @@ def validate_report(
     min_deck_overall: float = 93.0,
 ):
     errors: list[str] = []
+    expected_slide_set = set(range(1, expected_slides + 1))
 
     if report.get("schema") != GLOBAL_JURY_SCHEMA:
         errors.append(f"schema must be {GLOBAL_JURY_SCHEMA}")
@@ -213,6 +214,16 @@ def validate_report(
         ):
             if not _present(item.get(key)):
                 errors.append(f"{label}: {key} is required")
+        slides_reviewed = item.get("slides_reviewed")
+        if not isinstance(slides_reviewed, list) or not all(
+            isinstance(value, int) for value in slides_reviewed
+        ):
+            errors.append(f"{label}: slides_reviewed must be a list of integers")
+        elif set(slides_reviewed) != expected_slide_set or len(slides_reviewed) != expected_slides:
+            errors.append(
+                f"{label}: slides_reviewed must cover every slide exactly once; "
+                f"expected {sorted(expected_slide_set)}, got {slides_reviewed}"
+            )
         if item.get("verdict") not in {"pass", "fail"}:
             errors.append(f"{label}: verdict must be pass or fail")
     if history and history[-1].get("verdict") != "pass":
@@ -374,9 +385,8 @@ def validate_report(
             if not _present(evidence.get(key)):
                 errors.append(f"{label}: evidence.{key} is required")
 
-    expected = set(range(1, expected_slides + 1))
-    missing = sorted(expected - seen)
-    extra = sorted(seen - expected)
+    missing = sorted(expected_slide_set - seen)
+    extra = sorted(seen - expected_slide_set)
     if missing:
         errors.append(f"slides missing jury review: {missing}")
     if extra:
@@ -402,7 +412,15 @@ def validate_report(
     if report.get("overall_pass") is not True:
         errors.append("overall_pass must be true")
 
-    identity_ok = not any(error.startswith("deck_identity") for error in errors)
+    identity_markers = (
+        "deck_identity",
+        "source_identity",
+        "source_identity_is_preserved",
+        "no_generic_template_skin",
+    )
+    identity_ok = not any(
+        any(marker in error for marker in identity_markers) for error in errors
+    )
     return not errors, identity_ok, errors
 
 
