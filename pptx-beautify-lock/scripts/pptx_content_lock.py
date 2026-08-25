@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """PPTX semantic content-lock snapshot and verifier.
 
-繁體中文：建立 PPTX 內容 manifest，並比對美化前後是否有未授權的內容層差異。
-English: Create and compare semantic manifests for PPTX files.
+繁體中文：建立 PPTX protected-semantics manifest，比對美化前後是否有未授權變更。
+English: Create and compare protected-semantic manifests for PPTX files.
 
-Design intent:
-- Ignore presentation-only formatting that the skill explicitly allows.
-- Preserve semantic/functional content conservatively.
-- Fail closed when a protected semantic changes.
-
-This is not a byte-for-byte package comparer. It normalizes unstable relationship
-IDs where practical while locking text, tables, charts, links/actions, media,
-notes, embedded payloads, accessibility text, slide visibility, animation and
-transition semantics, and other content-bearing structures covered below.
+Principles:
+- Ignore allowed visual formatting and top-level object/z-order changes.
+- Preserve text/data/media/behavior associations, not just global value bags.
+- Normalize run segmentation so font/restyling tools may rebuild runs without a
+  false content regression.
+- Fail closed on protected semantics.
 """
 
 from __future__ import annotations
@@ -33,11 +30,17 @@ NS = {
     "c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
     "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
 }
-R_ID = "{%s}id" % NS["r"]
-R_EMBED = "{%s}embed" % NS["r"]
-R_LINK = "{%s}link" % NS["r"]
-
+R_NS_PREFIX = "{%s}" % NS["r"]
+R_ID = R_NS_PREFIX + "id"
+R_EMBED = R_NS_PREFIX + "embed"
+R_LINK = R_NS_PREFIX + "link"
 TABLE_SEMANTIC_ATTRS = {"gridSpan", "rowSpan", "hMerge", "vMerge"}
+VISUAL_RELATION_TYPE_FRAGMENTS = {
+    "diagramLayout",
+    "diagramQuickStyle",
+    "diagramColors",
+    "theme",
+}
 
 
 def sha256(data: bytes) -> str:
@@ -49,9 +52,7 @@ def stable_key(value) -> str:
 
 
 def local_name(name: str) -> str:
-    if "}" in name:
-        return name.rsplit("}", 1)[1]
-    return name
+    return name.rsplit("}", 1)[1] if "}" in name else name
 
 
 def read_xml(zf: zipfile.ZipFile, path: str):
@@ -91,17 +92,13 @@ def relationships(zf: zipfile.ZipFile, source_part: str) -> dict[str, dict]:
     return out
 
 
-def text_values(root) -> list[str]:
-    if root is None:
-        return []
-    return [el.text if el.text is not None else "" for el in root.findall(".//a:t", NS)]
-
-
 def canonical_element(node) -> dict | None:
-    """Serialize an XML subtree semantically, independent of namespace prefixes."""
     if node is None:
         return None
-    attrs = {local_name(k): v for k, v in sorted(node.attrib.items(), key=lambda kv: local_name(kv[0]))}
+    attrs = {
+        local_name(k): v
+        for k, v in sorted(node.attrib.items(), key=lambda kv: local_name(kv[0]))
+    }
     return {
         "tag": local_name(node.tag),
         "attrs": attrs,
@@ -110,10 +107,39 @@ def canonical_element(node) -> dict | None:
     }
 
 
+def paragraph_semantics(root) -> list[dict]:
+    """Protect paragraph text/list semantics while ignoring run formatting."""
+    if root is None:
+        return []
+    out = []
+    for p in root.findall(".//a:p", NS):
+        text = "".join(node.text or "" for node in p.findall(".//a:t", NS))
+        ppr = p.find("./a:pPr", NS)
+        level = ppr.attrib.get("lvl") if ppr is not None else None
+        bullet = None
+        if ppr is not None:
+            for child in list(ppr):
+                kind = local_name(child.tag)
+                if kind == "buChar":
+                    bullet = {"kind": kind, "char": child.attrib.get("char", "")}
+                    break
+                if kind == "buAutoNum":
+                    bullet = {
+                        "kind": kind,
+                        "type": child.attrib.get("type", ""),
+                        "startAt": child.attrib.get("startAt"),
+                    }
+                    break
+                if kind in {"buNone", "buBlip"}:
+                    bullet = {"kind": kind}
+                    break
+        out.append({"text": text, "level": level, "bullet": bullet})
+    return out
+
+
 def extract_math(root) -> list[dict]:
     if root is None:
         return []
-    # oMath elements are the formula-bearing units. Capturing each locks formula semantics.
     return [canonical_element(node) for node in root.findall(".//m:oMath", NS)]
 
 
@@ -126,12 +152,13 @@ def extract_tables(root) -> list[list[list[dict]]]:
         for tr in tbl.findall("./a:tr", NS):
             cells = []
             for tc in tr.findall("./a:tc", NS):
-                vals = [x.text if x.text is not None else "" for x in tc.findall(".//a:t", NS)]
                 semantic_attrs = {
-                    k: v for k, v in sorted(tc.attrib.items()) if local_name(k) in TABLE_SEMANTIC_ATTRS
+                    local_name(k): v
+                    for k, v in sorted(tc.attrib.items())
+                    if local_name(k) in TABLE_SEMANTIC_ATTRS
                 }
                 cells.append({
-                    "text": "".join(vals),
+                    "paragraphs": paragraph_semantics(tc),
                     "merge": semantic_attrs,
                 })
             rows.append(cells)
@@ -150,7 +177,7 @@ def chart_semantics(chart_root) -> dict:
         v = node.find("./c:v", NS)
         points.append({"idx": node.attrib.get("idx"), "v": "" if v is None or v.text is None else v.text})
     return {
-        "texts": text_values(chart_root),
+        "paragraphs": paragraph_semantics(chart_root),
         "formulas": formulas,
         "values": values,
         "series_text": series_text,
@@ -183,44 +210,35 @@ def crop_states(zf: zipfile.ZipFile, root, rels: dict[str, dict]) -> list[dict]:
         if blip is not None:
             rid = blip.attrib.get(R_EMBED) or blip.attrib.get(R_LINK)
         image_hash = None
-        image_target = None
+        external_target = None
         rel = rels.get(rid or "")
         if rel:
-            image_target = rel["target"]
-            if not rel["external"]:
+            if rel["external"]:
+                external_target = rel["target"]
+            else:
                 try:
                     image_hash = sha256(zf.read(rel["target"]))
                 except KeyError:
                     image_hash = "MISSING"
         out.append({
             "image_sha256": image_hash,
-            "image_target": image_target if rel and rel["external"] else None,
+            "external_target": external_target,
             "srcRect": dict(sorted(src.attrib.items())) if src is not None else {},
         })
     return sorted(out, key=stable_key)
 
 
-def hyperlink_semantics(root, rels: dict[str, dict]) -> list[dict]:
+def accessibility_semantics(root) -> list[dict]:
     if root is None:
         return []
     out = []
-    for tag in ("hlinkClick", "hlinkMouseOver"):
-        for node in root.findall(f".//a:{tag}", NS):
-            rid = node.attrib.get(R_ID)
-            rel = rels.get(rid or "")
-            attrs = {}
-            for key, value in sorted(node.attrib.items(), key=lambda kv: local_name(kv[0])):
-                if key != R_ID:
-                    attrs[local_name(key)] = value
-            out.append({
-                "kind": tag,
-                "attrs": attrs,
-                "relationship": None if rel is None else {
-                    "target": rel["target"],
-                    "external": rel["external"],
-                    "type": rel["type"],
-                },
-            })
+    for node in root.iter():
+        if local_name(node.tag) != "cNvPr":
+            continue
+        title = node.attrib.get("title")
+        descr = node.attrib.get("descr")
+        if title is not None or descr is not None:
+            out.append({"title": title or "", "descr": descr or ""})
     return sorted(out, key=stable_key)
 
 
@@ -235,29 +253,97 @@ def external_relationship_semantics(rels: dict[str, dict]) -> list[dict]:
     )
 
 
-def accessibility_semantics(root) -> list[dict]:
-    """Preserve accessibility text while allowing object names/geometry to change."""
+def _relationship_payload(zf: zipfile.ZipFile, rel: dict) -> dict | None:
+    typ = rel["type"]
+    if any(fragment in typ for fragment in VISUAL_RELATION_TYPE_FRAGMENTS):
+        return None
+    if rel["external"]:
+        return {"type": typ, "external": True, "target": rel["target"]}
+
+    target = rel["target"]
+    if target.startswith("ppt/media/"):
+        try:
+            return {"type": typ, "media_sha256": sha256(zf.read(target))}
+        except KeyError:
+            return {"type": typ, "media_sha256": "MISSING"}
+    if target.startswith("ppt/charts/"):
+        return {"type": typ, "chart": chart_semantics(read_xml(zf, target))}
+    if target.startswith("ppt/embeddings/") or "oleObject" in typ or "package" in typ:
+        try:
+            return {"type": typ, "payload_sha256": sha256(zf.read(target))}
+        except KeyError:
+            return {"type": typ, "payload_sha256": "MISSING"}
+    if "diagramData" in typ or target.startswith("ppt/diagrams/data"):
+        data_root = read_xml(zf, target)
+        return {
+            "type": typ,
+            "diagram_paragraphs": paragraph_semantics(data_root),
+            "diagram_math": extract_math(data_root),
+        }
+    # Internal slide/action/unknown content-bearing relationships fail closed by target.
+    return {"type": typ, "target": target}
+
+
+def relationship_uses(zf: zipfile.ZipFile, root, rels: dict[str, dict]) -> list[dict]:
     if root is None:
         return []
     out = []
     for node in root.iter():
-        if local_name(node.tag) != "cNvPr":
+        for attr_name, rid in node.attrib.items():
+            if not attr_name.startswith(R_NS_PREFIX):
+                continue
+            rel = rels.get(rid)
+            if rel is None:
+                out.append({
+                    "element": local_name(node.tag),
+                    "attr": local_name(attr_name),
+                    "relationship": "MISSING",
+                })
+                continue
+            payload = _relationship_payload(zf, rel)
+            if payload is None:
+                continue
+            out.append({
+                "element": local_name(node.tag),
+                "attr": local_name(attr_name),
+                "relationship": payload,
+            })
+    return sorted(out, key=stable_key)
+
+
+def object_semantics(zf: zipfile.ZipFile, root, rels: dict[str, dict]) -> list[dict]:
+    """Capture protected semantics per content-bearing object, independent of z-order."""
+    if root is None:
+        return []
+    sp_tree = root.find(".//p:spTree", NS)
+    if sp_tree is None:
+        return []
+    out = []
+    skip = {"nvGrpSpPr", "grpSpPr", "extLst"}
+    for child in list(sp_tree):
+        kind = local_name(child.tag)
+        if kind in skip:
             continue
-        title = node.attrib.get("title")
-        descr = node.attrib.get("descr")
-        if title is not None or descr is not None:
-            out.append({"title": title or "", "descr": descr or ""})
+        record = {
+            "kind": kind,
+            "paragraphs": paragraph_semantics(child),
+            "math": extract_math(child),
+            "tables": extract_tables(child),
+            "crop_states": crop_states(zf, child, rels),
+            "accessibility": accessibility_semantics(child),
+            "relationships": relationship_uses(zf, child, rels),
+        }
+        if any(record[key] for key in record if key != "kind"):
+            out.append(record)
     return sorted(out, key=stable_key)
 
 
 def transition_timing_semantics(root) -> dict:
     if root is None:
         return {"transition": None, "timing": None}
-    transition = root.find("./p:transition", NS)
-    timing = root.find("./p:timing", NS)
     return {
-        "transition": canonical_element(transition),
-        "timing": canonical_element(timing),
+        "transition": canonical_element(root.find("./p:transition", NS)),
+        "timing": canonical_element(root.find("./p:timing", NS)),
     }
 
 
@@ -265,11 +351,8 @@ def notes_semantics(zf: zipfile.ZipFile, notes_path: str) -> dict:
     root = read_xml(zf, notes_path)
     rels = relationships(zf, notes_path)
     return {
-        "texts": text_values(root),
-        "math": extract_math(root),
-        "hyperlinks": hyperlink_semantics(root, rels),
+        "objects": object_semantics(zf, root, rels),
         "external_relationships": external_relationship_semantics(rels),
-        "accessibility": accessibility_semantics(root),
     }
 
 
@@ -302,17 +385,12 @@ def slide_manifest(zf: zipfile.ZipFile, slide_path: str) -> dict:
                 embeddings.append({"missing": posixpath.basename(target)})
 
     return {
-        "texts": text_values(root),
-        "math": extract_math(root),
-        "tables": extract_tables(root),
-        "crop_states": crop_states(zf, root, rels),
+        "objects": object_semantics(zf, root, rels),
         "media": sorted(media, key=stable_key),
         "charts": sorted(charts, key=stable_key),
         "notes": notes,
         "embeddings": sorted(embeddings, key=stable_key),
-        "hyperlinks": hyperlink_semantics(root, rels),
         "external_relationships": external_relationship_semantics(rels),
-        "accessibility": accessibility_semantics(root),
         "slide_show": None if root is None else root.attrib.get("show", "1"),
         "transition_timing": transition_timing_semantics(root),
     }
@@ -342,18 +420,72 @@ def annotation_hashes(zf: zipfile.ZipFile) -> list[dict]:
     return sorted(protected, key=stable_key)
 
 
-def package_text_semantics(zf: zipfile.ZipFile, prefixes: tuple[str, ...]) -> list[dict]:
-    """Protect visible/master/SmartArt text stored outside slide XML."""
+def special_payload_hashes(zf: zipfile.ZipFile) -> list[dict]:
+    """Preserve macros/controls/custom XML and other opaque semantic payloads."""
+    prefixes = (
+        "customXml/",
+        "ppt/activeX/",
+        "ppt/ctrlProps/",
+        "ppt/tags/",
+        "ppt/vbaProject",
+    )
+    out = []
+    for name in sorted(zf.namelist()):
+        if name.endswith("/"):
+            continue
+        if name.startswith(prefixes):
+            out.append({"part": name, "sha256": sha256(zf.read(name))})
+    return out
+
+
+def off_slide_semantics(zf: zipfile.ZipFile) -> list[dict]:
+    prefixes = (
+        "ppt/slideMasters/",
+        "ppt/slideLayouts/",
+        "ppt/notesMasters/",
+        "ppt/handoutMasters/",
+        "ppt/diagrams/data",
+    )
     out = []
     for name in sorted(zf.namelist()):
         if not name.endswith(".xml") or not name.startswith(prefixes):
             continue
         root = read_xml(zf, name)
-        texts = text_values(root)
-        math = extract_math(root)
-        if texts or math:
-            out.append({"part": name, "texts": texts, "math": math})
+        rels = relationships(zf, name)
+        objects = object_semantics(zf, root, rels)
+        paragraphs = [] if objects else paragraph_semantics(root)
+        math = [] if objects else extract_math(root)
+        accessibility = [] if objects else accessibility_semantics(root)
+        rel_uses = [] if objects else relationship_uses(zf, root, rels)
+        if objects or paragraphs or math or accessibility or rel_uses:
+            out.append({
+                "part": name,
+                "objects": objects,
+                "paragraphs": paragraphs,
+                "math": math,
+                "accessibility": accessibility,
+                "relationships": rel_uses,
+                "external_relationships": external_relationship_semantics(rels),
+            })
     return out
+
+
+def package_external_relationships(zf: zipfile.ZipFile) -> list[dict]:
+    out = []
+    for name in sorted(zf.namelist()):
+        if not name.endswith(".rels"):
+            continue
+        root = read_xml(zf, name)
+        if root is None:
+            continue
+        for rel in list(root):
+            if rel.attrib.get("TargetMode") == "External":
+                out.append({
+                    "rels_part": name,
+                    "target": rel.attrib.get("Target", ""),
+                    "type": rel.attrib.get("Type", ""),
+                })
+    return sorted(out, key=stable_key)
 
 
 def build_manifest(path: str) -> dict:
@@ -361,18 +493,15 @@ def build_manifest(path: str) -> dict:
         order = slide_order(zf)
         slides = [slide_manifest(zf, p) for p in order]
         manifest = {
-            "schema": 3,
+            "schema": 4,
             "slide_count": len(order),
             "slides": slides,
-            # Exact package media set: original image/audio/video payloads may not be
-            # replaced, removed, re-encoded, or silently supplemented.
             "package_media": package_hashes(zf, "ppt/media/"),
             "package_embeddings": package_hashes(zf, "ppt/embeddings/"),
             "annotations": annotation_hashes(zf),
-            "off_slide_text": package_text_semantics(
-                zf,
-                ("ppt/slideMasters/", "ppt/slideLayouts/", "ppt/diagrams/data"),
-            ),
+            "special_payloads": special_payload_hashes(zf),
+            "off_slide_semantics": off_slide_semantics(zf),
+            "package_external_relationships": package_external_relationships(zf),
         }
     canonical = stable_key(manifest).encode("utf-8")
     manifest["semantic_sha256"] = sha256(canonical)
