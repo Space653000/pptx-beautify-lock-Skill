@@ -1,7 +1,7 @@
 {
   "name": "pptx-beautify-lock",
-  "version": "0.4.0",
-  "description": "Source-faithful PowerPoint beautification with hard Content Lock, Theme Discovery/Guard, bilingual Traditional Chinese + English typography, PPTX Linter, Auto Formatter, Design Agent, rendered Visual QA, and Regression Test.",
+  "version": "0.5.0",
+  "description": "Source-faithful PowerPoint beautification with hard Content Lock, Theme Discovery/Guard, Traditional Chinese + English typography, Layout Intelligence, Spatial QA, Design Agent, rendered Visual QA, strict Composition QA, and Regression v0.5.",
   "author": {
     "name": "Space653000",
     "url": "https://github.com/Space653000"
@@ -16,6 +16,9 @@
     "beautify",
     "content-lock",
     "theme-lock",
+    "layout-intelligence",
+    "spatial-qa",
+    "composition-qa",
     "traditional-chinese",
     "bilingual-typography",
     "claude-code",
