@@ -60,7 +60,9 @@ https://github.com/Space653000/pptx-beautify-lock-Skill
 
 ```text
 Read this repository and use pptx-beautify-lock/SKILL.md on this PPTX.
-啟用 Content Lock，只重新設計視覺層；只有 DELIVERY_PASS=true 才交付 final PPTX。
+啟用 Content Lock + Theme Lock + Layout Intelligence。
+先分析 Source Theme、Brand Terrain、Slide Role 與 Layout Skeleton，再美化。
+只有 DELIVERY_V05_PASS=true 才交付 final PPTX。
 ```
 
 根目錄入口：
@@ -77,4 +79,18 @@ Read this repository and use pptx-beautify-lock/SKILL.md on this PPTX.
 pip install -r requirements.txt
 ```
 
-完整品質流程除了 Python scripts，還需要宿主本身具備 PPTX 編輯與 render 能力。若無 render 能力，依 `SKILL.md` 只能產生 structural candidate，不能宣稱完整 `DELIVERY_PASS=true`。
+v0.5 完整品質流程除了 Python scripts，還需要宿主本身具備 PPTX 編輯與 render 能力。若無 render 能力，依 `SKILL.md` 只能產生 structural candidate，不能宣稱完整 final。
+
+Fully qualified v0.5 final 必須至少：
+
+```text
+CONTENT_LOCK_PASS=true
+THEME_FIDELITY_PASS=true
+SPATIAL_QA_PASS=true
+VISUAL_QA_PASS=true
+COMPOSITION_QA_PASS=true
+REGRESSION_V05_PASS=true
+DELIVERY_V05_PASS=true
+```
+
+`DELIVERY_PASS=true` 是舊版相容欄位，不是 v0.5 完成條件。
