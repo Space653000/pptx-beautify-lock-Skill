@@ -23,7 +23,8 @@ PPTX Linter
 - **Auto Formatter / Design Agent contract**：AI 可大幅重做 layout/typography/table/chart styling
 - **Rendered Visual QA**：要求逐頁檢查實際 render，不以 geometry heuristic 假裝「好看」
 - **Regression Test**：Content + Layout + Visual 三類證據整合
-- **Plugin marketplace packaging**：可供 Claude Code / Codex 類 harness 安裝
+- **URL self-bootstrap**：repo 內建跨 Claude Code / Codex 的 `scripts/install_skill.py`
+- **Plugin marketplace packaging**：可供支援 marketplace 的 harness 安裝
 - **Traditional Chinese first + English compatibility**
 - **GitHub Actions public-CLI contract tests**
 
@@ -47,6 +48,7 @@ Render 視覺驗證：
 pptx-beautify-lock/references/RENDER_VISUAL_QA.md
 ```
 
+URL bootstrap 規則：[`AI_BOOTSTRAP.md`](AI_BOOTSTRAP.md)  
 安裝方式：[`INSTALL.md`](INSTALL.md)  
 本次嚴謹審查紀錄：[`docs/QUALITY_AUDIT_2026-08-25.md`](docs/QUALITY_AUDIT_2026-08-25.md)
 
@@ -68,20 +70,43 @@ DELIVERY_PASS=true
 
 ## 最快使用方式：直接貼 GitHub URL
 
-把原始 PPTX 給 AI，再貼：
+把原始 PPTX 給 Claude Code 或 ChatGPT Codex，再貼：
 
 ```text
 https://github.com/Space653000/pptx-beautify-lock-Skill
 ```
 
-下指令：
+Agent 取得/開啟 repo 後，若宿主允許本機寫入與程式執行，會依 `CLAUDE.md` / `AGENTS.md` 自動 bootstrap：
+
+```bash
+# Claude Code
+python scripts/install_skill.py --target claude --force
+
+# ChatGPT Codex / Codex
+python scripts/install_skill.py --target codex --force
+```
+
+共同安裝器也可一次部署兩邊：
+
+```bash
+python scripts/install_skill.py --target both --force
+```
+
+成功條件：
 
 ```text
-Read this repository and use pptx-beautify-lock/SKILL.md on this PPTX.
-啟用 Content Lock，只重新設計視覺層。
-自動執行 Linter → Auto Formatter → Design Agent → Render Visual QA → Regression Test。
-只有 DELIVERY_PASS=true 才交付 final PPTX。
+INSTALL_PASS=true
 ```
+
+接著自動讀 `pptx-beautify-lock/SKILL.md` 並執行：
+
+```text
+Linter → Auto Formatter → Design Agent → Render Visual QA → Regression Test
+```
+
+只有 `DELIVERY_PASS=true` 才可宣稱 final。
+
+> **能力邊界：** 單純貼 URL 無法繞過宿主本身的安全限制。若宿主禁止下載/開啟 repo、禁止執行程式、或禁止寫入 `~/.claude/skills` / `~/.codex/skills`，Agent 必須直接從目前 repo 使用 Skill 並明確回報「未能持久安裝」，不得假裝安裝成功。
 
 ## Plugin 安裝
 
@@ -168,6 +193,7 @@ python -m unittest discover -s tests -v
 
 GitHub Actions 的 contract tests 目前至少驗證：
 
+- Claude Code / Codex installer 會把同一份 `SKILL.md` 安裝到兩個目標目錄
 - visual-only geometry/typography change → PASS
 - identical text with different run segmentation → PASS
 - visible text/table value/table merge change → FAIL
