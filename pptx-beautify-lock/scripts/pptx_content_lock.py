@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """PPTX semantic content-lock snapshot and verifier.
 
-繁體中文：
-建立 PPTX 內容 manifest，並比對美化前後是否有內容層差異。
-此工具刻意忽略多數視覺 formatting，但檢查文字、表格、圖表資料、
-媒體 payload、圖片 crop、備註、嵌入檔案與投影片順序。
+繁體中文：建立 PPTX 內容 manifest，並比對美化前後是否有內容層差異。
+English: Create and compare semantic manifests for PPTX files.
 
-English:
-Create and compare semantic manifests for PPTX files. The verifier is
-intentionally conservative and fails closed when frozen content differs.
+The verifier intentionally ignores most visual formatting while checking frozen
+content. It avoids unstable relationship IDs and filenames where possible.
 """
 
 from __future__ import annotations
@@ -27,7 +24,6 @@ NS = {
     "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
     "c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
-    "pr": "http://schemas.openxmlformats.org/package/2006/relationships",
 }
 R_ID = "{%s}id" % NS["r"]
 R_EMBED = "{%s}embed" % NS["r"]
@@ -35,6 +31,10 @@ R_EMBED = "{%s}embed" % NS["r"]
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def stable_key(value) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def read_xml(zf: zipfile.ZipFile, path: str):
@@ -96,33 +96,17 @@ def extract_tables(root) -> list[list[list[str]]]:
     return tables
 
 
-def extract_crop_states(root) -> list[dict]:
-    out = []
-    if root is None:
-        return out
-    for blip_fill in root.findall(".//p:blipFill", NS):
-        blip = blip_fill.find("./a:blip", NS)
-        src = blip_fill.find("./a:srcRect", NS)
-        out.append({
-            "embed_rid": blip.attrib.get(R_EMBED) if blip is not None else None,
-            "srcRect": dict(sorted(src.attrib.items())) if src is not None else {},
-        })
-    return out
-
-
 def chart_semantics(chart_root) -> dict:
     if chart_root is None:
         return {}
-    # Capture formulas, string caches, numeric caches, categories, series names,
-    # and explicit data labels as semantic chart content. Ignore style attrs.
     formulas = [x.text or "" for x in chart_root.findall(".//c:f", NS)]
-    strings = [x.text or "" for x in chart_root.findall(".//c:v", NS)]
-    tx = [x.text or "" for x in chart_root.findall(".//c:tx//c:v", NS)]
-    pt = []
+    values = [x.text or "" for x in chart_root.findall(".//c:v", NS)]
+    series_text = [x.text or "" for x in chart_root.findall(".//c:tx//c:v", NS)]
+    points = []
     for node in chart_root.findall(".//c:pt", NS):
         v = node.find("./c:v", NS)
-        pt.append({"idx": node.attrib.get("idx"), "v": "" if v is None or v.text is None else v.text})
-    return {"formulas": formulas, "values": strings, "series_text": tx, "points": pt}
+        points.append({"idx": node.attrib.get("idx"), "v": "" if v is None or v.text is None else v.text})
+    return {"formulas": formulas, "values": values, "series_text": series_text, "points": points}
 
 
 def slide_order(zf: zipfile.ZipFile) -> list[str]:
@@ -139,43 +123,64 @@ def slide_order(zf: zipfile.ZipFile) -> list[str]:
     return out
 
 
+def crop_states(zf: zipfile.ZipFile, root, rels: dict[str, dict]) -> list[dict]:
+    out = []
+    if root is None:
+        return out
+    for blip_fill in root.findall(".//p:blipFill", NS):
+        blip = blip_fill.find("./a:blip", NS)
+        src = blip_fill.find("./a:srcRect", NS)
+        rid = blip.attrib.get(R_EMBED) if blip is not None else None
+        image_hash = None
+        rel = rels.get(rid or "")
+        if rel and not rel["external"]:
+            try:
+                image_hash = sha256(zf.read(rel["target"]))
+            except KeyError:
+                image_hash = "MISSING"
+        out.append({
+            "image_sha256": image_hash,
+            "srcRect": dict(sorted(src.attrib.items())) if src is not None else {},
+        })
+    return sorted(out, key=stable_key)
+
+
 def slide_manifest(zf: zipfile.ZipFile, slide_path: str) -> dict:
     root = read_xml(zf, slide_path)
     rels = relationships(zf, slide_path)
-
     media = []
     charts = []
     notes_text = []
     embeddings = []
 
-    for rid, rel in sorted(rels.items()):
+    for rel in rels.values():
         if rel["external"]:
             continue
         target = rel["target"]
         typ = rel["type"]
         if "image" in typ or "audio" in typ or "video" in typ or target.startswith("ppt/media/"):
             try:
-                media.append({"rid": rid, "sha256": sha256(zf.read(target)), "name": posixpath.basename(target)})
+                media.append({"sha256": sha256(zf.read(target))})
             except KeyError:
-                media.append({"rid": rid, "missing": target})
+                media.append({"missing": posixpath.basename(target)})
         elif "chart" in typ or target.startswith("ppt/charts/"):
-            charts.append({"rid": rid, "semantic": chart_semantics(read_xml(zf, target))})
+            charts.append(chart_semantics(read_xml(zf, target)))
         elif "notesSlide" in typ or target.startswith("ppt/notesSlides/"):
             notes_text = text_values(read_xml(zf, target))
         elif "oleObject" in typ or "package" in typ or target.startswith("ppt/embeddings/"):
             try:
-                embeddings.append({"rid": rid, "sha256": sha256(zf.read(target)), "name": posixpath.basename(target)})
+                embeddings.append({"sha256": sha256(zf.read(target))})
             except KeyError:
-                embeddings.append({"rid": rid, "missing": target})
+                embeddings.append({"missing": posixpath.basename(target)})
 
     return {
         "texts": text_values(root),
         "tables": extract_tables(root),
-        "crop_states": extract_crop_states(root),
-        "media": media,
-        "charts": charts,
+        "crop_states": crop_states(zf, root, rels),
+        "media": sorted(media, key=stable_key),
+        "charts": sorted(charts, key=stable_key),
         "notes_text": notes_text,
-        "embeddings": embeddings,
+        "embeddings": sorted(embeddings, key=stable_key),
     }
 
 
@@ -183,8 +188,8 @@ def package_embeddings(zf: zipfile.ZipFile) -> list[dict]:
     out = []
     for name in sorted(zf.namelist()):
         if name.startswith("ppt/embeddings/") and not name.endswith("/"):
-            out.append({"name": posixpath.basename(name), "sha256": sha256(zf.read(name))})
-    return out
+            out.append({"sha256": sha256(zf.read(name))})
+    return sorted(out, key=stable_key)
 
 
 def build_manifest(path: str) -> dict:
@@ -192,13 +197,12 @@ def build_manifest(path: str) -> dict:
         order = slide_order(zf)
         slides = [slide_manifest(zf, p) for p in order]
         manifest = {
-            "schema": 1,
+            "schema": 2,
             "slide_count": len(order),
-            # Compare slides by semantic sequence, not internal rIds/filenames.
             "slides": slides,
             "package_embeddings": package_embeddings(zf),
         }
-    canonical = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    canonical = stable_key(manifest).encode("utf-8")
     manifest["semantic_sha256"] = sha256(canonical)
     return manifest
 
@@ -256,7 +260,7 @@ def cmd_verify(args) -> int:
         for item in diffs[:200]:
             print(item)
         if len(diffs) > 200:
-            print(f"... {len(diffs)-200} more differences omitted")
+            print(f"... {len(diffs) - 200} more differences omitted")
     return 0 if ok else 2
 
 
