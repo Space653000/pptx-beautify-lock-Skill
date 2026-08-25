@@ -18,9 +18,22 @@ This reference defines the rendered-slide review required before a fully qualifi
 
 必須 render **全部投影片**，不能只抽查首頁或問題頁。
 
+## Source-vs-final visual intent / 原始頁與完成頁對照
+
+若來源可 render，首頁、章節頁與任何使用 template/master/layout 的頁面，至少要對照來源 render 與 final render。
+
+目的不是要求版面相同，而是避免 final 新增來源沒有的模板提示、placeholder、sample text 或其他 presentation chrome。
+
+尤其要檢查：
+
+- 真正主標題/副標是否仍完整可見
+- 是否出現 `presentation title`、`click to add title`、`subtitle placeholder` 等 generic template text
+- 是否因換 layout/master 而讓原本不顯示的 placeholder 突然被 render
+- 修正重疊時是否錯刪真正內容，留下模板文字
+
 ## Visual QA 每頁必查 / Required checks per slide
 
-每一頁都必須明確判定以下八項：
+每一頁都必須明確判定以下九項：
 
 - `no_unintended_overlap`：沒有非刻意物件/文字重疊
 - `no_clipping_or_overflow`：沒有文字、表格、圖表被裁切或溢出
@@ -30,18 +43,29 @@ This reference defines the rendered-slide review required before a fully qualifi
 - `alignment_consistent`：對齊、邊界、grid 不凌亂
 - `tables_charts_readable`：表格與圖表標籤、欄列、legend/axis 清楚
 - `style_consistent`：與整份 deck 的字體、色彩、spacing、元件語言一致
+- `no_template_placeholder_artifacts`：沒有 generic placeholder、template prompt、sample title/subtitle、未預期母片示意文字或其與真正內容的重疊
+
+### `no_template_placeholder_artifacts` 必須判定 false 的例子
+
+- 真正標題存在，但下方仍顯示 `presentation title`
+- `Click to add title` / `Click to add subtitle` 被 render 出來
+- template subtitle/sample text 與真正副標重疊
+- master/layout placeholder 因重構而突然出現在 final
+- 為消除 overlap 而刪掉真正內容、只留下 placeholder
+
+這類缺陷即使其他八項都通過，也**不得交付**。
 
 ## 分數 / Score
 
 每頁給 `0–100` 的視覺品質分數。預設交付門檻：**每頁 >= 85**。
 
-分數只是輔助；八個 boolean checks **全部必須為 true**，不能用高分抵銷 clipping 或 unreadable text。
+分數只是輔助；九個 boolean checks **全部必須為 true**，不能用高分抵銷 clipping、unreadable text 或 template-artifact leakage。
 
 ## visual_qa.json 格式
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "slide_count": 2,
   "render_engine": "Microsoft PowerPoint",
   "reviewer": "AI vision reviewer",
@@ -58,7 +82,8 @@ This reference defines the rendered-slide review required before a fully qualifi
         "hierarchy_clear": true,
         "alignment_consistent": true,
         "tables_charts_readable": true,
-        "style_consistent": true
+        "style_consistent": true,
+        "no_template_placeholder_artifacts": true
       },
       "notes": ""
     }
@@ -87,6 +112,16 @@ render → review every slide → repair visual defects → content verify → r
 ```
 
 每一輪修改後都要重新執行 Content Lock verification；不能假設視覺修復不會碰到內容。
+
+### Placeholder repair priority / Placeholder 修復優先序
+
+當 generic template placeholder 與真正內容衝突時：
+
+1. 保留真正來源內容。
+2. 不修改 master/layout 的 protected semantics。
+3. 優先改用 blank/content-safe layout、取消 placeholder 實例化、改 layout assignment、調整 z-order/visibility 或其他只影響視覺呈現的方法。
+4. 重新 render 確認 placeholder 不再出現。
+5. 再跑 Content Lock；任何 protected semantic 差異都必須回復。
 
 若第 3 輪仍有 blocking visual defect：
 
