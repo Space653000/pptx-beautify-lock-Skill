@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """PPTX Linter for pptx-beautify-lock.
 
-繁體中文：掃描 PowerPoint 幾何、字級、表格密度、重疊、邊界與跨頁一致性風險。
-English: Scan PPTX geometry, typography, table density, overlap, edge and
-cross-slide consistency risks.
+Scans geometry, typography, table density, overlap, template-placeholder
+leakage, CJK fallback risks, edge margins, and cross-slide consistency.
 
-This tool never modifies the input file. Findings are conservative heuristics;
-rendered visual QA remains authoritative for appearance.
+This tool never modifies the input file. Rendered Visual QA remains the final
+authority for appearance, source-theme fidelity, and actual font rendering.
 """
 
 from __future__ import annotations
@@ -26,6 +25,30 @@ except ImportError:
     raise SystemExit(3)
 
 EMU_PER_INCH = 914400
+
+GENERIC_TEMPLATE_TEXTS = {
+    "presentation title",
+    "presentation subtitle",
+    "click to add title",
+    "click to add subtitle",
+    "click to add text",
+    "click to add content",
+    "title placeholder",
+    "subtitle placeholder",
+}
+
+# These fonts are fine for pure Latin text, but should not be trusted as the
+# sole explicit family for Traditional-Chinese/mixed runs. PowerPoint may fall
+# back silently to another CJK font and break visual consistency.
+LATIN_ONLY_RISK_FONTS = {
+    "arial",
+    "helvetica",
+    "inter",
+    "aptos",
+    "aptos display",
+    "calibri",
+    "roboto",
+}
 
 
 @dataclass
@@ -68,6 +91,30 @@ def _visible_text(shape):
     return False
 
 
+def _normalize_text(value: str) -> str:
+    return " ".join((value or "").strip().casefold().split())
+
+
+def _generic_template_text(shape):
+    if not getattr(shape, "has_text_frame", False):
+        return None
+    text = _normalize_text(getattr(shape, "text", ""))
+    return text if text in GENERIC_TEMPLATE_TEXTS else None
+
+
+def _contains_cjk(text: str) -> bool:
+    for ch in text or "":
+        code = ord(ch)
+        if (
+            0x3400 <= code <= 0x4DBF
+            or 0x4E00 <= code <= 0x9FFF
+            or 0xF900 <= code <= 0xFAFF
+            or 0x3100 <= code <= 0x312F
+        ):
+            return True
+    return False
+
+
 def _iter_text_frames(shape, prefix: str | None = None):
     name = prefix or getattr(shape, "name", "shape")
     if getattr(shape, "has_text_frame", False):
@@ -102,6 +149,20 @@ def _font_names(shape):
                 if r.font.name:
                     names.add(r.font.name.strip())
     return names
+
+
+def _font_fallback_risks(shape):
+    risks = []
+    for location, tf in _iter_text_frames(shape):
+        for p_idx, paragraph in enumerate(tf.paragraphs, 1):
+            for r_idx, run in enumerate(paragraph.runs, 1):
+                text = run.text or ""
+                font_name = (run.font.name or "").strip()
+                if not font_name or not _contains_cjk(text):
+                    continue
+                if font_name.casefold() in LATIN_ONLY_RISK_FONTS:
+                    risks.append((location, p_idx, r_idx, font_name, text[:40]))
+    return risks
 
 
 def _text_chars(shape):
@@ -143,7 +204,6 @@ def _title_profile(shape, sw, sh):
         ph_name = getattr(shape.placeholder_format.type, "name", str(shape.placeholder_format.type))
     except Exception:
         return None
-    # Exclude centered title-slide placeholders; compare normal slide titles only.
     if ph_name != "TITLE":
         return None
     return (
@@ -166,6 +226,7 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
     for sidx, slide in enumerate(prs.slides, 1):
         shapes = list(slide.shapes)
         slide_fonts = set()
+        template_indexes: set[int] = set()
 
         for i, shape in enumerate(shapes):
             name = getattr(shape, "name", f"shape-{i}")
@@ -180,7 +241,6 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                 findings.append(Finding(sidx, "ERROR", "out-of-bounds",
                     "物件超出投影片邊界", "Object extends beyond slide bounds", [name]))
 
-            # Edge risk: ignore backgrounds and deliberate full-bleed images/shapes.
             if not _background_like(shape, sw, sh):
                 mx, my = sw * edge_margin_ratio, sh * edge_margin_ratio
                 if l < mx or t < my or (sw - r) < mx or (sh - b) < my:
@@ -188,11 +248,30 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                         "物件非常接近投影片邊界，請確認是否為刻意設計",
                         "Object is very close to a slide edge; confirm this is intentional", [name]))
 
+            generic = _generic_template_text(shape)
+            if generic:
+                template_indexes.add(i)
+                if getattr(shape, "is_placeholder", False):
+                    findings.append(Finding(sidx, "ERROR", "template-placeholder-artifact",
+                        f"偵測到 final 不應顯示的模板 placeholder 文字：{generic!r}",
+                        f"Generic template placeholder text is visible: {generic!r}", [name]))
+                else:
+                    findings.append(Finding(sidx, "WARNING", "generic-template-text",
+                        f"偵測到疑似模板示意文字：{generic!r}，需確認是否真為使用者內容",
+                        f"Generic template-like text detected: {generic!r}; confirm whether it is user-authored",
+                        [name]))
+
             sizes = _font_sizes(shape)
             if sizes and min(sizes) < tiny_pt:
                 findings.append(Finding(sidx, "WARNING", "tiny-text",
                     f"偵測到 {min(sizes):.1f} pt 的小字，可能影響投影可讀性",
                     f"Detected {min(sizes):.1f} pt text; projected readability may be poor", [name]))
+
+            for location, p_idx, r_idx, font_name, preview in _font_fallback_risks(shape):
+                findings.append(Finding(sidx, "WARNING", "cjk-font-fallback-risk",
+                    f"繁中/中文 run 明確指定為偏 Latin 字體 {font_name!r}，可能產生不可控 fallback",
+                    f"CJK text is explicitly assigned to Latin-oriented font {font_name!r}; fallback may be unstable",
+                    [f"{location}/P{p_idx}/R{r_idx}: {preview}"]))
 
             slide_fonts |= _font_names(shape)
 
@@ -205,10 +284,9 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                 if high_density:
                     findings.append(Finding(sidx, "WARNING", "table-density-risk",
                         "表格資訊密度偏高，請檢查欄寬、列高、padding 與實際 render 可讀性",
-                        "Table density is high; review column width, row height, padding and rendered readability",
+                        "Table density is high; review sizing, padding and rendered readability",
                         [name]))
 
-            # Text-density is only a render-review hint; it is not an overflow proof.
             chars = _text_chars(shape)
             area_in2 = _area_in2(shape)
             if chars >= 280 and area_in2 > 0 and chars / area_in2 > 55:
@@ -227,7 +305,6 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                 f"同頁偵測到 {len(slide_fonts)} 種明確字型，視覺一致性風險偏高",
                 f"Detected {len(slide_fonts)} explicit font families on one slide", sorted(slide_fonts)))
 
-        # Conservative overlap heuristic.
         for i in range(len(shapes)):
             a = shapes[i]
             if _background_like(a, sw, sh) or getattr(a, "shape_type", None) == MSO_SHAPE_TYPE.GROUP:
@@ -246,13 +323,20 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                 if denom <= 0:
                     continue
                 ratio = inter / denom
+
+                if (i in template_indexes or j in template_indexes) and _visible_text(a) and _visible_text(b):
+                    findings.append(Finding(sidx, "ERROR", "template-artifact-overlap",
+                        f"模板示意文字與真正可見內容重疊 {ratio:.1%}；必須保留真正內容並停用模板 artifact",
+                        f"Generic template text overlaps visible content by {ratio:.1%}; preserve real content and suppress the artifact",
+                        [getattr(a, "name", "A"), getattr(b, "name", "B")]))
+                    continue
+
                 if ratio >= overlap_threshold:
                     findings.append(Finding(sidx, "WARNING", "suspicious-overlap",
                         f"兩個物件疑似重疊 {ratio:.1%}，需 render 確認是否為刻意",
                         f"Two objects overlap by {ratio:.1%}; render review is required",
                         [getattr(a, "name", "A"), getattr(b, "name", "B")]))
 
-    # Cross-slide explicit-font outliers. INFO only because deliberate accent/code fonts exist.
     if len(prs.slides) >= 3:
         font_counts = Counter(font for fonts in slide_font_sets.values() for font in fonts)
         if len(font_counts) > 2:
@@ -264,7 +348,6 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                         "This slide uses explicit font families not used on other slides; confirm intentionally",
                         outliers))
 
-    # Title alignment consistency for normal TITLE placeholders.
     if len(title_profiles) >= 3:
         med_left = statistics.median(p[1][0] for p in title_profiles)
         med_top = statistics.median(p[1][1] for p in title_profiles)
