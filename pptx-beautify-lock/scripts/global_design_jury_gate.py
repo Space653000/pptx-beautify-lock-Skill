@@ -179,10 +179,44 @@ def validate_report(
         errors.append("reviewer is required")
     if not str(report.get("audience_profile", "")).strip():
         errors.append("audience_profile is required")
+    for key in ("source_render_set", "final_render_set"):
+        if not _present(report.get(key)):
+            errors.append(f"{key} is required")
 
     review_rounds = report.get("review_rounds")
     if not isinstance(review_rounds, int) or review_rounds < 2:
         errors.append("review_rounds must be an integer >= 2")
+        review_rounds = 0
+
+    history = report.get("review_history")
+    if not isinstance(history, list):
+        errors.append("review_history must be a list")
+        history = []
+    if review_rounds and len(history) != review_rounds:
+        errors.append(
+            f"review_history length {len(history)} != review_rounds {review_rounds}"
+        )
+    for index, item in enumerate(history, 1):
+        label = f"review_history round {index}"
+        if not isinstance(item, dict):
+            errors.append(f"{label}: item must be an object")
+            continue
+        if item.get("round") != index:
+            errors.append(f"{label}: round must equal {index}")
+        for key in (
+            "reviewer",
+            "render_fingerprint",
+            "source_render_reference",
+            "final_render_reference",
+            "findings_summary",
+            "actions_or_verification",
+        ):
+            if not _present(item.get(key)):
+                errors.append(f"{label}: {key} is required")
+        if item.get("verdict") not in {"pass", "fail"}:
+            errors.append(f"{label}: verdict must be pass or fail")
+    if history and history[-1].get("verdict") != "pass":
+        errors.append("final review_history verdict must be pass")
 
     lenses = report.get("jury_lenses")
     if not isinstance(lenses, dict):
