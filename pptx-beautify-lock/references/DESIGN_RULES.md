@@ -2,129 +2,142 @@
 
 ## 目標 / Goal
 
-在完全不改內容的前提下，將投影片提升到專業商務簡報等級。
+在完全不改內容的前提下，將投影片提升到專業商務/工程簡報等級，並**保留來源 Visual DNA**。
 
-Upgrade the deck to professional presentation quality without changing content.
+Upgrade the deck without changing content or arbitrarily replacing the source visual identity.
+
+開始設計前必讀：
+
+- [`THEME_DISCOVERY.md`](THEME_DISCOVERY.md)
+- [`TYPOGRAPHY_BILINGUAL.md`](TYPOGRAPHY_BILINGUAL.md)
 
 ## 視覺優先順序 / Visual priorities
 
-1. Hierarchy / 視覺階層
-2. Readability / 可讀性
-3. Alignment / 對齊
-4. Spacing rhythm / 間距節奏
-5. Consistency / 跨頁一致性
-6. Density control / 資訊密度控制
-7. Restraint / 避免過度裝飾
+1. Source theme fidelity / 來源主色調忠實度
+2. Hierarchy / 視覺階層
+3. Readability / 可讀性
+4. Bilingual typography / 繁中英文兼容
+5. Alignment / 對齊
+6. Spacing rhythm / 間距節奏
+7. Consistency / 跨頁一致性
+8. Density control / 資訊密度控制
+9. Restraint / 避免過度裝飾
 
-## Typography / 字體
+## Color / 主色調與配色
 
-- 優先使用系統可取得且跨平台穩定的字型。
-- 繁中優先：Noto Sans TC、Microsoft JhengHei、PingFang TC 等實際可用字型。
-- 英文優先：Aptos、Arial、Inter、Helvetica 類型；依環境可用性選擇。
-- 同一份簡報主要字族不超過 2 套。
-- 標題、內文、註解應形成清楚階層。
-- 不要以過度縮小字級解決 overflow。
+### Source-first rule
 
-Recommended minimums unless the source format or use case demands otherwise:
+- source light → final 保持 light
+- source dark → final 保持 dark
+- source mixed → 保留原本 page-role pattern
+- 原本已有品牌色 → 沿用同 hue family；只做 tint/shade/contrast 升級
+- 不得因為 AI 偏好 navy/black 就把白底簡報改成深色
 
-- Title: 28–36 pt
-- Section title: 24–32 pt
+若來源是白底工程圖表、灰 grid、黑文字、紅色 limit marker，預設建立 **light technical visual system**；紅色是 semantic accent，不是全 deck brand primary。
+
+### Allowed
+
+- white → subtle off-white
+- grey neutral refinement
+- 原 accent 的較深/較淺色階
+- table header、section band 使用來源 hue family
+- semantic warning/pass/fail colors 保持原意
+
+### Forbidden without user override
+
+- light ↔ dark polarity inversion
+- unrelated new primary hue
+- high-saturation multi-color dashboard treatment
+- 把圖表 marker 顏色誤升級成全 deck 主色
+
+## Typography / 繁中英文雙語字體
+
+### Default safe strategy
+
+優先使用一個完整支援繁中的 Sans Serif 字族同時承擔中英文，例如：
+
+- Noto Sans TC
+- Microsoft JhengHei / 微軟正黑體
+- PingFang TC / 蘋方-繁
+- Source Han Sans TC / 思源黑體 TC
+
+只有在環境已確認字體存在時使用。
+
+### Latin pairing
+
+Aptos / Inter / Arial / Helvetica 可用於**純英文 run**，但不得把包含繁中的 mixed run 整段指定為 Latin-only font，避免不可控 fallback。
+
+若採中英分字族：
+
+- 繁中：CJK-safe family
+- 純英文：Latin family
+- 數字與技術符號要 render 驗證 baseline/weight
+- run segmentation 改變後仍需 Content Lock PASS
+
+同一份簡報原則上最多 1 套 CJK + 1 套 Latin family。
+
+Recommended minimums：
+
+- Cover title: 28–40 pt
+- Section title: 24–34 pt
+- Data title: 22–30 pt
 - Body: 16–22 pt
-- Dense table: 12–16 pt
+- Dense table: 11–16 pt
 - Footnote: 10–12 pt
 
-若為大型會議室簡報，應優先使用更大字級。
+不要以過度縮小字級解決 overflow。
 
 ## Layout / 版面
 
 - 使用一致 grid。
 - 頁面四周保留安全邊界。
 - 同層級元素使用一致起始線。
-- 優先建立 1–3 個明確 visual anchors，不讓所有物件都搶注意力。
-- 可重新排列既有物件，但不得改變其內容或跨頁搬移內容。
-- 不得讓文字、表格、圖表貼近頁面邊界。
+- 優先建立 1–3 個 visual anchors。
+- 可重新排列既有物件，但不得改變內容或跨頁搬移內容。
+- 真正標題優先；不得讓 generic template placeholder 疊在內容上。
 
 ## Tables / 表格
 
-可修改：
+可修改：欄寬、列高、padding、header fill、border、alignment、font styling、size/placement。
 
-- 欄寬、列高
-- cell padding
-- header fill
-- borders
-- text alignment
-- font styling
-- table overall size and placement
+不可修改：cell values、row/column order、merged-cell semantics、units、footnotes。
 
-不可修改：
+Design guidance：
 
-- cell values
-- row/column order
-- merged-cell semantics
-- units
-- footnotes
-
-Design guidance:
-
-- 減少不必要的框線。
-- header 要明顯但克制。
-- 數字欄位通常右對齊。
-- 同類單位與小數位呈現應保留來源文字，不自行格式化。
+- 減少不必要框線
+- header 明顯但克制
+- 數字通常右對齊
+- 高密度表格優先用 CJK-safe 單一字族，避免 fallback 造成欄列跳動
 
 ## Charts / 圖表
 
-可調整 style，但不得改 data。
+可調整 visual style，但不得改 data。
 
-Allowed examples:
+Allowed：color palette within Theme Lock、font、legend、axis styling、label placement、plot-area size、background/border。
 
-- color palette
-- font
-- legend position
-- axis styling
-- data-label placement
-- plot-area size
-- chart background/border
-
-Forbidden examples:
-
-- changing values
-- filtering categories
-- reordering data for storytelling
-- replacing chart type when it could change interpretation without explicit user instruction
-
-若更換 chart type 可能改變解讀，預設禁止。
+Forbidden：changing values、filtering、reordering data、未授權改 chart type、把 semantic red/green 改成其他含義。
 
 ## Images / 圖片
 
-- 可以移動與縮放。
-- 不可替換來源圖片。
-- 不可重新生成。
-- 預設不可改變 crop state。
-- 避免拉伸變形；保持 aspect ratio，除非來源本來就是非等比例。
-
-## Color / 配色
-
-- 建立有限且一致的 palette。
-- 背景與文字要有足夠對比。
-- 強調色只用於真正需要 attention 的項目。
-- 不要每個區塊使用不同高飽和色。
+- 可移動與縮放
+- 不可替換/重生成
+- 預設不可改 crop state
+- 保持 aspect ratio，除非來源本來即非等比例
 
 ## Visual repair / 版面修復
 
 必須主動處理：
 
 - unintended overlap
-- clipping
-- overflow
+- template-placeholder artifacts
+- clipping / overflow
 - out-of-bounds
-- inconsistent margins
-- misalignment
+- inconsistent margins / alignment
 - inconsistent font sizing
-- table cells that visually collide
-- chart labels that collide
+- CJK fallback / missing glyph risk
+- table/chart collisions
+- source-theme polarity drift
 
 ## Native editability / 可編輯性
 
-優先保留 PowerPoint 原生可編輯物件。
-
-Do not flatten an entire slide to one image merely to obtain visual fidelity.
+優先保留 PowerPoint 原生可編輯物件。不得把整頁 flatten 成圖片來取得視覺效果。
