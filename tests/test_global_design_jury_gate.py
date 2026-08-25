@@ -73,6 +73,7 @@ def valid_payload():
                 "render_fingerprint": "candidate-render-1",
                 "source_render_reference": "source-render-sha256:aaa",
                 "final_render_reference": "candidate-render-1",
+                "slides_reviewed": [1],
                 "findings_summary": "minor spacing refinement identified",
                 "actions_or_verification": "refined spacing and re-rendered",
                 "verdict": "fail",
@@ -83,6 +84,7 @@ def valid_payload():
                 "render_fingerprint": "final-render-sha256:bbb",
                 "source_render_reference": "source-render-sha256:aaa",
                 "final_render_reference": "final-render-sha256:bbb",
+                "slides_reviewed": [1],
                 "findings_summary": "no blocking world-class defects",
                 "actions_or_verification": "independent second verification completed",
                 "verdict": "pass",
@@ -165,6 +167,15 @@ class GlobalDesignJuryGateTests(unittest.TestCase):
             self.assertIn("DECK_IDENTITY_PASS=false", result.stdout)
             self.assertIn("generic_template_risk 11", result.stdout)
 
+    def test_per_slide_source_identity_failure_also_fails_deck_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            payload = deepcopy(valid_payload())
+            payload["slides"][0]["scores"]["source_identity"] = 94
+            result = run_gate(self.write_report(td, payload))
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("DECK_IDENTITY_PASS=false", result.stdout)
+            self.assertIn("source_identity score 94", result.stdout)
+
     def test_missing_independent_jury_lens_fails(self):
         with tempfile.TemporaryDirectory() as td:
             payload = deepcopy(valid_payload())
@@ -180,6 +191,14 @@ class GlobalDesignJuryGateTests(unittest.TestCase):
             result = run_gate(self.write_report(td, payload))
             self.assertNotEqual(0, result.returncode)
             self.assertIn("review_history length 0 != review_rounds 2", result.stdout)
+
+    def test_each_review_round_must_cover_every_slide(self):
+        with tempfile.TemporaryDirectory() as td:
+            payload = deepcopy(valid_payload())
+            payload["review_history"][0]["slides_reviewed"] = []
+            result = run_gate(self.write_report(td, payload))
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("slides_reviewed must cover every slide exactly once", result.stdout)
 
 
 if __name__ == "__main__":
