@@ -1,88 +1,77 @@
-# Regression Test 回歸測試規範 / Regression Test Rules
+# Regression Test / 回歸測試規範
 
-## 目的 / Purpose
+Regression Test 是最後的**品質證明**，不是單純重新跑一次 Linter。
 
-Regression Test 是最後品質閘門。它必須同時證明兩件事：
+## Gate A — Content Integrity
 
-1. **內容沒有任何未授權變更。**
-2. **版面品質沒有退化到不可交付。**
+以 [`CONTENT_LOCK.md`](CONTENT_LOCK.md) 為 protected-semantics 唯一定義，使用：
 
-The output deck is valid only if both content integrity and layout quality gates pass.
+```bash
+python scripts/pptx_content_lock.py verify source.pptx output.pptx
+```
 
-## Gate A — Content Integrity / 內容完整性
-
-必須使用 `pptx_content_lock.py verify` 或等效機制，比對：
-
-- slide count/order
-- every visible text run value
-- table cell values and table structure
-- chart formulas/cached values/series semantics
-- media payload hashes
-- image crop states
-- notes text
-- embedded package payloads
-
-唯一允許結果：
+必須：
 
 ```text
 CONTENT_LOCK_PASS=true
 ```
 
-任何差異都視為 regression failure。
+目前 verifier 會保守檢查至少：slide order/count、visible/master/SmartArt text、Office Math、table values/merge topology、chart text/data/formulas/caches、media payload/crop、notes、comments/annotations、accessibility text、hyperlinks/actions/external targets、hidden slide state、transition/timing semantics 與 embedded payloads。
 
-## Gate B — Layout QA / 版面品質
+## Gate B — Structural Layout QA
 
-至少檢查：
+使用 `pptx_lint.py` 比較 baseline/output。
 
-- no out-of-bounds object
-- no non-positive geometry
-- no severe unintended overlap
-- no severe tiny-text regression
-- slide count preserved
-- output PPTX can be parsed successfully
+Hard requirements：
 
-若環境可 render，還必須進行逐頁 render QA。
+- final `lint_errors == 0`
+- hard errors 不得比 source 增加
+- `tiny-text` / `table-density-risk` 等 blocking readability warnings 不得比 source 惡化
+- output 可正常解析
 
-## Gate C — Regression against baseline / 與基準比較
+## Gate C — Visual QA
 
-除了驗證絕對門檻，建議比較來源與輸出：
+幾何 heuristic 無法判斷「刻意疊圖」與「真的撞版」，也無法可靠證明文字實際 render 沒有 clipping/overflow。
 
-- `out_of_bounds`: 不得增加
-- `severe_overlaps`: 不得增加
-- `tiny_text`: 原則上不得增加；若來源原本很小，輸出不得更小
-- `font_family_count`: 不應無理由增加
-- `visual inconsistency warnings`: 不應增加
+因此完整交付必須依 [`RENDER_VISUAL_QA.md`](RENDER_VISUAL_QA.md) render 全部頁面並建立 `visual_qa.json`。
 
-如果美化後造成更多硬錯誤，即使視覺看似更漂亮，也必須 FAIL。
+Visual QA 會 adjudicate suspicious overlap、dense text、cross-slide style 等 heuristic findings。
 
-## Gate D — Deliverability / 可交付性
+## Gate D — Delivery
 
-最後輸出必須：
+完整命令：
 
-- 是有效 `.pptx`
-- 不覆寫唯一原始檔
-- 可由 PowerPoint-compatible reader 解析
-- 保持原生可編輯物件為優先
-- 不得用整頁圖片取代原本可編輯內容
+```bash
+python scripts/pptx_regression.py source.pptx output.pptx \
+  --visual-qa-report visual_qa.json \
+  --require-visual-qa
+```
 
-## 建議輸出 / Recommended output
+正式 final deck 必須：
 
 ```text
-REGRESSION_PASS=true
 CONTENT_LOCK_PASS=true
 LAYOUT_QA_PASS=true
-baseline_layout_errors=8
-output_layout_errors=0
-baseline_layout_warnings=17
-output_layout_warnings=4
+VISUAL_QA_PASS=true
+REGRESSION_PASS=true
+DELIVERY_PASS=true
 ```
 
-## Fail closed / 保守失敗
+其中：
 
-只要無法證明內容一致或無法安全解析重要物件，必須：
+- `REGRESSION_PASS`：本次要求的 structural + visual regression gate 通過
+- `DELIVERY_PASS`：Content + Layout + Visual 三類品質證據全部齊全
 
-```text
-REGRESSION_PASS=false
-```
+若沒有 renderer/visual review，最多只能產生 structural candidate；不得以 `REGRESSION_PASS` 的部分結果冒充完整 `DELIVERY_PASS`。
 
-不得用「看起來應該沒問題」取代驗證。
+## Fail closed
+
+以下任一狀況直接 FAIL：
+
+- protected semantic 無法安全驗證
+- embedded/media payload 不一致
+- source/output 重要內容關係無法解析
+- final hard layout error > 0
+- required visual QA 缺頁、缺 check、低於門檻或 overall fail
+
+不要用「看起來差不多」取代證據。
