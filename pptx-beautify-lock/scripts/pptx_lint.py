@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """PPTX Linter for pptx-beautify-lock.
 
-繁體中文：掃描 PowerPoint 幾何、字級、重疊、邊界與字型一致性風險。
-English: Scan PPTX geometry, typography, overlap, edge and font consistency risks.
+繁體中文：掃描 PowerPoint 幾何、字級、表格密度、重疊、邊界與跨頁一致性風險。
+English: Scan PPTX geometry, typography, table density, overlap, edge and
+cross-slide consistency risks.
 
-This tool never modifies the input file.
+This tool never modifies the input file. Findings are conservative heuristics;
+rendered visual QA remains authoritative for appearance.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
+import statistics
 import sys
 from dataclasses import asdict, dataclass
 
@@ -20,6 +24,8 @@ try:
 except ImportError:
     print("ERROR=python-pptx is required. Install with: pip install python-pptx", file=sys.stderr)
     raise SystemExit(3)
+
+EMU_PER_INCH = 914400
 
 
 @dataclass
@@ -40,6 +46,10 @@ def _area(b):
     return max(0, b[2] - b[0]) * max(0, b[3] - b[1])
 
 
+def _area_in2(shape):
+    return max(0.0, shape.width / EMU_PER_INCH) * max(0.0, shape.height / EMU_PER_INCH)
+
+
 def _intersection(a, b):
     x1, y1 = max(a[0], b[0]), max(a[1], b[1])
     x2, y2 = min(a[2], b[2]), min(a[3], b[3])
@@ -49,33 +59,100 @@ def _intersection(a, b):
 
 
 def _visible_text(shape):
-    return bool(getattr(shape, "has_text_frame", False) and (shape.text or "").strip())
+    if getattr(shape, "has_text_frame", False) and (shape.text or "").strip():
+        return True
+    if getattr(shape, "has_table", False):
+        return any((cell.text or "").strip() for row in shape.table.rows for cell in row.cells)
+    if getattr(shape, "shape_type", None) == MSO_SHAPE_TYPE.GROUP:
+        return any(_visible_text(child) for child in shape.shapes)
+    return False
+
+
+def _iter_text_frames(shape, prefix: str | None = None):
+    name = prefix or getattr(shape, "name", "shape")
+    if getattr(shape, "has_text_frame", False):
+        yield name, shape.text_frame
+
+    if getattr(shape, "has_table", False):
+        for r_idx, row in enumerate(shape.table.rows, 1):
+            for c_idx, cell in enumerate(row.cells, 1):
+                yield f"{name}[R{r_idx}C{c_idx}]", cell.text_frame
+
+    if getattr(shape, "shape_type", None) == MSO_SHAPE_TYPE.GROUP:
+        for child in shape.shapes:
+            child_name = f"{name}/{getattr(child, 'name', 'child')}"
+            yield from _iter_text_frames(child, child_name)
 
 
 def _font_sizes(shape):
     values = []
-    if not getattr(shape, "has_text_frame", False):
-        return values
-    for p in shape.text_frame.paragraphs:
-        for r in p.runs:
-            if r.font.size is not None:
-                values.append(float(r.font.size.pt))
+    for _, tf in _iter_text_frames(shape):
+        for p in tf.paragraphs:
+            for r in p.runs:
+                if r.font.size is not None:
+                    values.append(float(r.font.size.pt))
     return values
 
 
 def _font_names(shape):
     names = set()
-    if not getattr(shape, "has_text_frame", False):
-        return names
-    for p in shape.text_frame.paragraphs:
-        for r in p.runs:
-            if r.font.name:
-                names.add(r.font.name.strip())
+    for _, tf in _iter_text_frames(shape):
+        for p in tf.paragraphs:
+            for r in p.runs:
+                if r.font.name:
+                    names.add(r.font.name.strip())
     return names
+
+
+def _text_chars(shape):
+    total = 0
+    for _, tf in _iter_text_frames(shape):
+        total += sum(len((p.text or "").strip()) for p in tf.paragraphs)
+    return total
 
 
 def _background_like(shape, sw, sh):
     return _area(_box(shape)) >= 0.85 * sw * sh
+
+
+def _table_density(shape):
+    if not getattr(shape, "has_table", False):
+        return None
+    table = shape.table
+    rows = len(table.rows)
+    cols = len(table.columns)
+    cells = rows * cols
+    if cells <= 0:
+        return None
+    chars = sum(len((cell.text or "").strip()) for row in table.rows for cell in row.cells)
+    area_in2 = max(_area_in2(shape), 0.01)
+    return {
+        "rows": rows,
+        "cols": cols,
+        "cells": cells,
+        "chars": chars,
+        "avg_cell_area_in2": area_in2 / cells,
+        "chars_per_in2": chars / area_in2,
+    }
+
+
+def _title_profile(shape, sw, sh):
+    if not getattr(shape, "is_placeholder", False):
+        return None
+    try:
+        ph_name = getattr(shape.placeholder_format.type, "name", str(shape.placeholder_format.type))
+    except Exception:
+        return None
+    # Exclude centered title-slide placeholders; compare normal slide titles only.
+    if ph_name != "TITLE":
+        return None
+    return (
+        shape.left / sw,
+        shape.top / sh,
+        shape.width / sw,
+        shape.height / sh,
+        getattr(shape, "name", "title"),
+    )
 
 
 def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float = 0.15,
@@ -83,6 +160,8 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
     prs = Presentation(path)
     sw, sh = prs.slide_width, prs.slide_height
     findings: list[Finding] = []
+    slide_font_sets: dict[int, set[str]] = {}
+    title_profiles: list[tuple[int, tuple]] = []
 
     for sidx, slide in enumerate(prs.slides, 1):
         shapes = list(slide.shapes)
@@ -117,6 +196,32 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
 
             slide_fonts |= _font_names(shape)
 
+            density = _table_density(shape)
+            if density is not None:
+                high_density = (
+                    (density["cells"] >= 8 and density["avg_cell_area_in2"] < 0.22)
+                    or density["chars_per_in2"] > 85
+                )
+                if high_density:
+                    findings.append(Finding(sidx, "WARNING", "table-density-risk",
+                        "表格資訊密度偏高，請檢查欄寬、列高、padding 與實際 render 可讀性",
+                        "Table density is high; review column width, row height, padding and rendered readability",
+                        [name]))
+
+            # Text-density is only a render-review hint; it is not an overflow proof.
+            chars = _text_chars(shape)
+            area_in2 = _area_in2(shape)
+            if chars >= 280 and area_in2 > 0 and chars / area_in2 > 55:
+                findings.append(Finding(sidx, "INFO", "dense-text-region",
+                    "文字區域資訊密度偏高，需 render 確認沒有 overflow/clipping",
+                    "Dense text region; render to confirm there is no overflow/clipping", [name]))
+
+            title = _title_profile(shape, sw, sh)
+            if title is not None:
+                title_profiles.append((sidx, title))
+
+        slide_font_sets[sidx] = slide_fonts
+
         if len(slide_fonts) > max_fonts_per_slide:
             findings.append(Finding(sidx, "WARNING", "too-many-fonts",
                 f"同頁偵測到 {len(slide_fonts)} 種明確字型，視覺一致性風險偏高",
@@ -147,14 +252,47 @@ def scan_presentation(path: str, tiny_pt: float = 11.0, overlap_threshold: float
                         f"Two objects overlap by {ratio:.1%}; render review is required",
                         [getattr(a, "name", "A"), getattr(b, "name", "B")]))
 
+    # Cross-slide explicit-font outliers. INFO only because deliberate accent/code fonts exist.
+    if len(prs.slides) >= 3:
+        font_counts = Counter(font for fonts in slide_font_sets.values() for font in fonts)
+        if len(font_counts) > 2:
+            for sidx, fonts in slide_font_sets.items():
+                outliers = sorted(font for font in fonts if font_counts[font] == 1)
+                if outliers:
+                    findings.append(Finding(sidx, "INFO", "cross-slide-font-outlier",
+                        "此頁含其他頁未使用的明確字型，請確認是否為刻意",
+                        "This slide uses explicit font families not used on other slides; confirm intentionally",
+                        outliers))
+
+    # Title alignment consistency for normal TITLE placeholders.
+    if len(title_profiles) >= 3:
+        med_left = statistics.median(p[1][0] for p in title_profiles)
+        med_top = statistics.median(p[1][1] for p in title_profiles)
+        med_width = statistics.median(p[1][2] for p in title_profiles)
+        med_height = statistics.median(p[1][3] for p in title_profiles)
+        for sidx, profile in title_profiles:
+            left, top, width, height, name = profile
+            if (
+                abs(left - med_left) > 0.04
+                or abs(top - med_top) > 0.04
+                or abs(width - med_width) > 0.10
+                or abs(height - med_height) > 0.08
+            ):
+                findings.append(Finding(sidx, "INFO", "title-layout-outlier",
+                    "標題區位置/尺寸與多數一般頁差異較大，請確認跨頁設計一致性",
+                    "Title geometry differs materially from most standard slides; review cross-slide consistency",
+                    [name]))
+
     errors = sum(1 for f in findings if f.severity == "ERROR")
     warnings = sum(1 for f in findings if f.severity == "WARNING")
     infos = sum(1 for f in findings if f.severity == "INFO")
+    by_rule = Counter(f.rule for f in findings)
     return {
         "slides_checked": len(prs.slides),
         "lint_errors": errors,
         "lint_warnings": warnings,
         "lint_infos": infos,
+        "findings_by_rule": dict(sorted(by_rule.items())),
         "LINT_PASS": errors == 0,
         "findings": [asdict(f) for f in findings],
     }
