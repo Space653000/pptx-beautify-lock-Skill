@@ -25,7 +25,7 @@
 
 ## `review_history`
 
-`review_rounds` 不能只是一個數字。必須有等長 history：
+`review_rounds` 不能只是一個數字。必須有等長 history，**而且每一輪都必須逐頁覆蓋整份 deck**：
 
 ```json
 [
@@ -35,6 +35,7 @@
     "render_fingerprint": "candidate-render-hash-or-reference",
     "source_render_reference": "source-render-set",
     "final_render_reference": "candidate-render-set",
+    "slides_reviewed": [1, 2, 3, 4, 5],
     "findings_summary": "what failed or what required refinement",
     "actions_or_verification": "what was changed or how the independent verification was performed",
     "verdict": "fail"
@@ -45,6 +46,7 @@
     "render_fingerprint": "final-render-hash-or-reference",
     "source_render_reference": "source-render-set",
     "final_render_reference": "final-render-set",
+    "slides_reviewed": [1, 2, 3, 4, 5],
     "findings_summary": "no blocking world-class defects",
     "actions_or_verification": "independent second verification completed",
     "verdict": "pass"
@@ -52,7 +54,7 @@
 ]
 ```
 
-最後一輪必須 `verdict=pass`。
+若 `slide_count=15`，每一輪 `slides_reviewed` 必須恰好包含 `1..15`，不可抽樣、漏頁或重複。最後一輪必須 `verdict=pass`。
 
 ## `jury_lenses`
 
@@ -95,6 +97,8 @@
   "generic_template_risk": 4
 }
 ```
+
+`DECK_IDENTITY_PASS` 不只看 deck-level 欄位；**任何單頁 `source_identity_is_preserved=false` 或 `source_identity` 分數低於門檻，也必須讓 Deck Identity 失敗。**
 
 ## Per-slide required structure
 
