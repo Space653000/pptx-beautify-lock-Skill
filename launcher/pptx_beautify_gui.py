@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Offline Windows PPTX beautifier.
 
-No Claude Code, Codex, GitHub access, HTTP requests, or cloud AI are used at
-runtime. The executable applies a deterministic local beautification engine.
+No external AI agent, repository access, HTTP request, or network service is used
+at runtime. The executable applies a deterministic local beautification engine.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ class App(tk.Tk):
         )
         ttk.Label(
             root,
-            text="完全本機：不呼叫 Claude / Codex、不讀 GitHub、不需要網路",
+            text="完全本機：不呼叫外部 AI、不讀 GitHub、不需要網路",
             font=("Segoe UI", 10),
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 4))
         ttk.Label(
