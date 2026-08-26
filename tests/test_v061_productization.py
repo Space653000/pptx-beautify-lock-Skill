@@ -11,18 +11,25 @@ class V061ProductizationTests(unittest.TestCase):
         self.assertTrue(launcher.is_file())
         py_compile.compile(str(launcher), doraise=True)
 
-    def test_launcher_is_beautify_only_and_points_to_canonical_skill_url(self):
+    def test_launcher_is_beautify_only_and_fully_offline(self):
         text = (ROOT / "launcher" / "pptx_beautify_gui.py").read_text(encoding="utf-8")
         for required in [
-            "https://github.com/Space653000/pptx-beautify-lock-Skill",
             "1. 輸入 PPTX",
             "2. 輸出 PPTX",
             "3. 美化風格",
-            "開始美化",
-            "open and read this canonical Skill repository",
+            "開始離線美化",
+            "OFFLINE_ONLY = True",
+            "CLOUD_AI_ENABLED = False",
+            "NETWORK_REQUIRED = False",
         ]:
             self.assertIn(required, text)
         for forbidden in [
+            "https://github.com/Space653000/pptx-beautify-lock-Skill",
+            "open and read this canonical Skill repository",
+            "PROMPT_TEMPLATE",
+            "subprocess.Popen",
+            "Claude Code",
+            "Codex CLI",
             "安裝 / 更新 Skill",
             "全面備份",
             "Dual: Claude → Codex",
