@@ -38,10 +38,16 @@ jobs:
           --collect-all PIL
           launcher/pptx_beautify_portable.py
 
-      - name: Smoke test executable exists
+      - name: Execute portable runtime self-test
         shell: pwsh
         run: |
           if (-not (Test-Path 'dist/PPTX-Beautify-Lock.exe')) { throw 'EXE missing' }
+          $process = Start-Process -FilePath (Resolve-Path 'dist/PPTX-Beautify-Lock.exe') -ArgumentList '--portable-self-test' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Portable EXE self-test failed with exit code $($process.ExitCode)" }
+
+      - name: Hash release executable
+        shell: pwsh
+        run: |
           $hash = Get-FileHash 'dist/PPTX-Beautify-Lock.exe' -Algorithm SHA256
           $hash | Format-List
           "SHA256=$($hash.Hash)" | Out-File -Encoding ascii 'dist/SHA256.txt'
