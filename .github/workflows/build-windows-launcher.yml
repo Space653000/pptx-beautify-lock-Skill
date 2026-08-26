@@ -36,7 +36,6 @@ jobs:
           --collect-all pptx
           --collect-all lxml
           --collect-all PIL
-          --collect-all xlsxwriter
           launcher/pptx_beautify_portable.py
 
       - name: Smoke test executable exists
