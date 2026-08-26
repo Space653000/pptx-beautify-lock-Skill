@@ -1,44 +1,48 @@
-# Windows GUI / 一鍵選檔介面
+# Windows PPTX Beautifier / Windows 投影片美化介面
 
-`PPTX Beautify Lock` 提供 Windows 檔案選擇 GUI，讓使用者不用每次手打 prompt。
+v0.6.2 起，產品邊界固定拆成三件互不混合的東西：
 
-## Recommended production mode / 建議模式
+1. **Skill** — 永遠以 GitHub repository 為 canonical source：
+   `https://github.com/Space653000/pptx-beautify-lock-Skill`
+2. **PPTX-Beautify.exe** — 只負責美化 PowerPoint；不安裝 Skill、不更新 Skill、不備份 GitHub。
+3. **BACKUP-pptx-beautify-lock-Skill.bat** — 獨立雙擊備份工具，只負責把 GitHub repository 抓到 BAT 所在資料夾。
 
-**Dual: Claude → Codex**
+## PPTX-Beautify.exe
 
-1. Claude Code 執行主要 layout/design/refactor。
-2. Codex 做獨立 full-deck release review，必要時修復。
-3. Launcher 再跑本機 Content/Theme/Layout/Lint guards。
-4. `final_report.txt` 缺任何 v0.6 Gate 就不宣稱成功。
+GUI 只保留三個使用者設定：
 
-也可以單獨選 Claude Code 或 Codex。
+1. **輸入 PPTX** — 可選任意 `.pptx`。
+2. **輸出 PPTX** — 可另存到任意資料夾、任意檔名；禁止覆寫來源檔。
+3. **美化風格** — 可從預設值選擇，也可直接輸入自訂風格。
+
+然後按 **開始美化**。
+
+EXE 會自動尋找可用的 AI Agent：
+
+- 優先 Claude Code CLI (`claude`)
+- 若沒有 Claude Code，改用 Codex CLI (`codex`)
+
+EXE 不安裝或複製 Skill。它會在工作 prompt 中要求 AI **直接開啟並閱讀 canonical GitHub Skill URL**，再依最新版 main 規則處理簡報。
+
+## Style presets
+
+- 自動（忠於原稿 / Source-faithful）
+- 專業技術（Technical Clean）
+- 商務簡潔（Executive Minimal）
+- 現代極簡（Modern Minimal）
+- 高階科技簡報（Premium Tech, preserve source palette）
+
+Combobox 可直接輸入其他自訂風格。
 
 ## Requirements
 
 - Windows 10/11
-- Git for Windows
-- Python 3.11+，或下載 GitHub Actions 產出的 `PPTX-Beautify-Lock.exe`
-- 已登入至少一個：
-  - Claude Code CLI (`claude`)
-  - Codex CLI (`codex`)
-- Dual mode 需要兩者都已登入
-- PowerPoint 或 LibreOffice/其他可信 renderer 可提升實際 render fidelity
+- 已安裝並登入至少一個 AI Agent：Claude Code 或 Codex CLI
+- Agent 執行時需要能存取 canonical GitHub Skill URL
 
-## Run from source
+EXE 本身不要求 Git，也不要求另外安裝 Python。
 
-雙擊：
-
-```text
-PPTX-Beautify-Lock.cmd
-```
-
-或：
-
-```powershell
-python launcher\pptx_beautify_gui.py
-```
-
-## Portable EXE
+## Build
 
 GitHub Actions workflow：
 
@@ -46,71 +50,40 @@ GitHub Actions workflow：
 build-windows-launcher
 ```
 
-會在 Windows runner 產生：
+會產生：
 
 ```text
-PPTX-Beautify-Lock.exe
+PPTX-Beautify.exe
 ```
 
-從 Actions 的 `PPTX-Beautify-Lock-Windows` artifact 下載即可。
-
-## UI workflow
-
-1. **選擇來源 PPTX** — source 永不覆寫。
-2. 選擇輸出資料夾。
-3. 選擇 Agent 模式。
-4. 點 **安裝 / 更新 Skill**。
-5. 點 **頂級美化**。
-6. Final 預設命名：
+Build 必須先實際執行：
 
 ```text
-<原檔名>__TOP_TIER_FINAL.pptx
+PPTX-Beautify.exe --portable-self-test
 ```
 
-QA evidence 放在：
+確認 EXE 內沒有 Skill installer、GitHub backup、repo bootstrap 等混合責任，才允許 artifact upload。
+
+## Standalone backup BAT
+
+把：
 
 ```text
-<輸出資料夾>\.pptx_beautify_work\...
+BACKUP-pptx-beautify-lock-Skill.bat
 ```
 
-## Quality policy
+放到任何 Windows 資料夾並雙擊。
 
-Production launcher 會要求：
-
-- Content Lock
-- Theme / Deck Identity
-- empty placeholder removal
-- Traditional Chinese + English font portability
-- sibling data-slide parity（例如 POWER / THD / HOHD）
-- full-deck rerender after every repair
-- three complete full-deck review passes
-- Global Design Jury
-- no-regression release
-
-核心原則：
-
-> **Fix A without breaking B.**
-
-任何局部改善造成其他已通過頁面退化，整份 deck 不得 release。
-
-## Backup
-
-執行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\backup_to_windows.ps1
-```
-
-預設備份到：
+它會在 BAT 同層建立或更新：
 
 ```text
-C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil
+pptx-beautify-lock-Skill\
 ```
 
-中央 Skill Catalog 會同步備份到：
+來源固定是：
 
 ```text
-C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil\_catalog\Claude-code-ChatGPT-Codex---SKILL
+https://github.com/Space653000/pptx-beautify-lock-Skill.git
 ```
 
-備份採 fast-forward only；遇到本地未提交變更會停止，不會強制覆蓋。
+BAT 使用完整 `git clone`，所以會保留 Git repository 與 history；再次執行時採 `fetch --all --tags --prune` + `pull --ff-only`，不會強制覆寫本地修改。
