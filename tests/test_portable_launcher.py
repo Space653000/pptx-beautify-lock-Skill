@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-import tempfile
+import sys
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+GUI = ROOT / "launcher" / "pptx_beautify_gui.py"
 PORTABLE = ROOT / "launcher" / "pptx_beautify_portable.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "build-windows-launcher.yml"
+BACKUP_BAT = ROOT / "BACKUP-pptx-beautify-lock-Skill.bat"
 
 
 def load_portable():
-    import sys
-
     launcher = str(ROOT / "launcher")
     if launcher not in sys.path:
         sys.path.insert(0, launcher)
@@ -25,37 +25,47 @@ def load_portable():
 
 
 class PortableLauncherTests(unittest.TestCase):
-    def test_in_process_script_runner_captures_output_and_exit_code(self):
+    def test_portable_self_test_passes(self):
         module = load_portable()
-        logs: list[str] = []
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            script = root / "probe.py"
-            script.write_text("print('PORTABLE_PROBE_OK')\nraise SystemExit(0)\n", encoding="utf-8")
-            rc = module._run_python_script(script, [], root, logs.append)
-        self.assertEqual(rc, 0)
-        self.assertIn("PORTABLE_PROBE_OK", logs)
+        self.assertEqual(module._portable_self_test(), 0)
 
-    def test_in_process_script_runner_preserves_nonzero_exit(self):
-        module = load_portable()
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            script = root / "probe_fail.py"
-            script.write_text("raise SystemExit(7)\n", encoding="utf-8")
-            rc = module._run_python_script(script, [], root, lambda _: None)
-        self.assertEqual(rc, 7)
+    def test_gui_has_only_input_output_style_beautify_product_controls(self):
+        text = GUI.read_text(encoding="utf-8")
+        self.assertIn("1. 輸入 PPTX", text)
+        self.assertIn("2. 輸出 PPTX", text)
+        self.assertIn("3. 美化風格", text)
+        self.assertIn("開始美化", text)
+        self.assertIn("asksaveasfilename", text)
+        self.assertNotIn("安裝 / 更新 Skill", text)
+        self.assertNotIn("全面備份", text)
+        self.assertNotIn("執行模式", text)
 
-    def test_portable_entry_does_not_spawn_sys_executable_for_python_scripts(self):
-        text = PORTABLE.read_text(encoding="utf-8")
-        self.assertNotIn("[sys.executable", text)
-        self.assertIn("runpy.run_path", text)
-        self.assertIn("archive/refs/heads/main.zip", text)
+    def test_gui_reads_canonical_skill_url_without_install_or_repo_bootstrap(self):
+        text = GUI.read_text(encoding="utf-8")
+        self.assertIn(
+            "https://github.com/Space653000/pptx-beautify-lock-Skill",
+            text,
+        )
+        self.assertIn("open and read this canonical Skill repository", text)
+        self.assertNotIn("install_from_checkout", text)
+        self.assertNotIn("update_canonical_repo", text)
+        self.assertNotIn("backup_to_windows.ps1", text)
+        self.assertNotIn("git clone", text.lower())
 
-    def test_windows_build_targets_portable_entry_and_bundles_pptx_runtime(self):
+    def test_backup_is_a_separate_double_click_bat(self):
+        text = BACKUP_BAT.read_text(encoding="utf-8")
+        self.assertIn("%~dp0pptx-beautify-lock-Skill", text)
+        self.assertIn("git clone", text)
+        self.assertIn("fetch --all --tags --prune", text)
+        self.assertIn("pull --ff-only", text)
+
+    def test_windows_build_is_minimal_and_self_tests_compiled_exe(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("launcher/pptx_beautify_portable.py", workflow)
-        self.assertIn("-r requirements.txt", workflow)
-        self.assertIn("--collect-all pptx", workflow)
+        self.assertIn("--name PPTX-Beautify", workflow)
+        self.assertIn("--portable-self-test", workflow)
+        self.assertNotIn("--collect-all pptx", workflow)
+        self.assertNotIn("-r requirements.txt", workflow)
 
 
 if __name__ == "__main__":
