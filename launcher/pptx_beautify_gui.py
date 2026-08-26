@@ -13,7 +13,6 @@ Windows .exe with PyInstaller.
 from __future__ import annotations
 
 import datetime as _dt
-import json
 import os
 from pathlib import Path
 import queue
@@ -25,7 +24,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-APP_TITLE = "PPTX Beautify Lock — Global Design Jury"
+APP_TITLE = "PPTX Beautify Lock v0.6.1 — Strict Production"
 CANONICAL_REPO = "https://github.com/Space653000/pptx-beautify-lock-Skill"
 DEFAULT_BACKUP = r"C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil"
 FINAL_SUFFIX = "__TOP_TIER_FINAL.pptx"
@@ -78,7 +77,7 @@ REQUIRED QA FILES under WORKSPACE / QA EVIDENCE DIR:
 - global_design_jury.json
 - final_report.txt
 
-The final_report.txt must explicitly contain:
+The final_report.txt must explicitly contain ALL of these lines:
 CONTENT_LOCK_PASS=true
 THEME_FIDELITY_PASS=true
 SPATIAL_QA_PASS=true
@@ -89,6 +88,11 @@ DECK_IDENTITY_PASS=true
 GLOBAL_DESIGN_JURY_PASS=true
 REGRESSION_V06_PASS=true
 DELIVERY_V06_PASS=true
+EMPTY_PLACEHOLDER_PASS=true
+FONT_PORTABILITY_PASS=true
+SIBLING_STYLE_PARITY_PASS=true
+FULL_DECK_REGRESSION_PASS=true
+THREE_PASS_REVIEW_PASS=true
 
 Do not claim success unless every line is true and the final PPTX exists at the
 exact requested output path.
@@ -112,7 +116,8 @@ Perform a complete rerender of the whole deck. If any defect exists, repair only
 what is needed and then rerender/recheck ALL slides again. Preserve protected
 content exactly. Regenerate visual_qa.json, composition_qa.json,
 global_design_jury.json, and final_report.txt. Release only if every required v0.6
-gate is true. Otherwise fail closed and write the exact failed slide/gate.
+and v0.6.1 production gate is true. Otherwise fail closed and write the exact
+failed slide/gate.
 """.strip()
 
 
@@ -229,6 +234,11 @@ def final_report_is_green(workdir: Path) -> tuple[bool, str]:
         "GLOBAL_DESIGN_JURY_PASS=true",
         "REGRESSION_V06_PASS=true",
         "DELIVERY_V06_PASS=true",
+        "EMPTY_PLACEHOLDER_PASS=true",
+        "FONT_PORTABILITY_PASS=true",
+        "SIBLING_STYLE_PARITY_PASS=true",
+        "FULL_DECK_REGRESSION_PASS=true",
+        "THREE_PASS_REVIEW_PASS=true",
     ]
     missing = [item for item in required if item not in text]
     return (not missing, "OK" if not missing else "missing: " + ", ".join(missing))
@@ -322,6 +332,7 @@ class App(tk.Tk):
             return
         self._busy = True
         self.status_var.set("Running…")
+
         def wrapper():
             try:
                 target()
@@ -330,6 +341,7 @@ class App(tk.Tk):
             finally:
                 self._busy = False
                 self.status_var.set("Ready")
+
         threading.Thread(target=wrapper, daemon=True).start()
 
     def _cache_root(self) -> Path:
@@ -341,22 +353,45 @@ class App(tk.Tk):
         return bool(repo and install_from_checkout(repo, self._emit))
 
     def _start_install(self):
-        self._thread(lambda: messagebox.showinfo(APP_TITLE, "Skill 安裝 / 更新完成。") if self._ensure_install() else messagebox.showerror(APP_TITLE, "Skill 安裝失敗，請看 Log。"))
+        self._thread(
+            lambda: messagebox.showinfo(APP_TITLE, "Skill 安裝 / 更新完成。")
+            if self._ensure_install()
+            else messagebox.showerror(APP_TITLE, "Skill 安裝失敗，請看 Log。")
+        )
 
     def _start_backup(self):
         def work():
-            repo = update_canonical_repo(Path(DEFAULT_BACKUP).parent, self._emit)
+            repo = update_canonical_repo(self._cache_root(), self._emit)
             if not repo:
-                messagebox.showerror(APP_TITLE, "備份失敗，請看 Log。")
+                messagebox.showerror(APP_TITLE, "無法更新 canonical repo，備份取消。請看 Log。")
                 return
-            target = Path(DEFAULT_BACKUP)
-            if repo != target:
-                if target.exists():
-                    self._emit(f"Backup target already exists: {target}")
-                else:
-                    shutil.copytree(repo, target)
-                    self._emit(f"Backup copied to: {target}")
-            messagebox.showinfo(APP_TITLE, f"備份完成：\n{target}")
+            script = repo / "scripts" / "backup_to_windows.ps1"
+            if not script.is_file():
+                messagebox.showerror(APP_TITLE, f"找不到備份腳本：\n{script}")
+                return
+            powershell = _which("powershell") or _which("pwsh")
+            if not powershell:
+                messagebox.showerror(APP_TITLE, "找不到 PowerShell。")
+                return
+            rc = _run(
+                [
+                    powershell,
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script),
+                    "-Target",
+                    DEFAULT_BACKUP,
+                ],
+                repo,
+                self._emit,
+            )
+            if rc != 0:
+                messagebox.showerror(APP_TITLE, "備份未通過；為避免覆寫本地修改已停止。請看 Log。")
+                return
+            messagebox.showinfo(APP_TITLE, f"全面備份完成：\n{DEFAULT_BACKUP}")
+
         self._thread(work)
 
     def _start_run(self):
@@ -416,11 +451,15 @@ class App(tk.Tk):
             structural = run_local_structural_guards(skill, source_copy, final, workdir, self._emit)
             report_ok, report_msg = final_report_is_green(workdir)
             if not structural or not report_ok:
-                messagebox.showerror(APP_TITLE, f"Release Gate 未通過：{report_msg}\n保留候選檔供檢查：\n{final}\nQA：{workdir}")
+                messagebox.showerror(
+                    APP_TITLE,
+                    f"Release Gate 未通過：{report_msg}\n保留候選檔供檢查：\n{final}\nQA：{workdir}",
+                )
                 return
 
-            self._emit(f"DELIVERY_V06_PASS=true\nFINAL={final}")
-            messagebox.showinfo(APP_TITLE, f"完成並通過 Release Gate：\n{final}")
+            self._emit(f"DELIVERY_V06_PASS=true\nPRODUCTION_V061_PASS=true\nFINAL={final}")
+            messagebox.showinfo(APP_TITLE, f"完成並通過 v0.6.1 Strict Production Release Gate：\n{final}")
+
         self._thread(work)
 
     def _open_output(self):
