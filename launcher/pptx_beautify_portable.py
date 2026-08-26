@@ -32,7 +32,6 @@ import zipfile
 import lxml  # noqa: F401
 import PIL  # noqa: F401
 import pptx  # noqa: F401
-import xlsxwriter  # noqa: F401
 
 import pptx_beautify_gui as core
 
