@@ -1,27 +1,28 @@
 ---
 name: pptx-beautify-lock
-description: "Beautify, repair, restyle, or auto-format an existing PPT/PPTX while preserving protected content, source visual DNA, brand terrain, spatial composition, and deck identity. 既有 PowerPoint 需要美化、修重疊/overflow、統一繁中英文雙語字體、重新設計視覺與版面骨骼，但文字/數據/圖片等內容不可變。Runs Content Lock → Theme Discovery → Linter → Auto Formatter → Layout Intelligence → Design Agent → Render Visual QA → Composition QA → Global Design Jury → Regression v0.6."
+description: "Strictly beautify, repair, restyle, or auto-format an existing PPT/PPTX while preserving protected content, source visual DNA, brand terrain, spatial composition, and deck identity. 既有 PowerPoint 需要頂級美化、修重疊/overflow、統一繁中英文雙語字體、重新設計視覺與版面骨骼，但文字/數據/圖片等內容不可變。Runs Content Lock → Theme/Identity Discovery → Linter → Auto Formatter → Layout Intelligence → Design Agent → full render → Visual/Composition QA → Global Design Jury → full-deck regression."
 license: MIT
 metadata:
-  version: "0.6.0"
+  version: "0.6.1"
   languages: "zh-TW,en"
   compatibility: "Claude Code, Codex, ChatGPT Skills, Agent-Skills-compatible coding agents"
 ---
 
-# PPTX Beautify Lock v0.6 — Global Design Jury
+# PPTX Beautify Lock v0.6.1 — Strict Production Release
 
 **繁體中文為主要說明語言；English is retained for cross-agent compatibility.**
 
-## Core contracts / 核心契約
+## Mission / 任務
 
-1. **Content Lock** — protected semantics immutable。
-2. **Theme Lock** — 未授權不得 arbitrary rebrand / light↔dark flip。
-3. **Bilingual Typography** — 繁中＋英文 glyph-safe、協調、可讀。
-4. **Layout Intelligence** — brand terrain、grid rails、spacing rhythm、reading order、visual balance、peer alignment 都是正式品質條件。
-5. **Deck Identity Guard** — 美化後仍必須是原 deck 的成熟版本，不可模板化收斂。
-6. **Global Design Jury** — 世界級不是套某品牌的皮；要同時通過 Purpose/Hierarchy/Simplicity/Craft、Executive Communication、Domain/Role Fit 三個 lens。
+把既有 PPTX 美化到可進入全球頂級科技客戶的 executive / engineering review，同時把來源內容視為不可變契約。
 
-必讀：
+不是把所有投影片洗成同一套模板；先理解來源的靈魂、品牌、角色、資訊密度與視覺 DNA，再把「原本那份簡報」升級成熟。
+
+> **不是學 Apple 的皮，而是學 Purpose、Hierarchy、Simplicity、Craft 的苛刻程度；不是學顧問公司的模板，而是學 executive communication 的結構；不是學 technical keynote 的配色，而是學資訊密度與視覺焦點的控制。**
+
+## Mandatory references / 必讀規範
+
+開始修改前必須讀：
 
 - `references/CONTENT_LOCK.md`
 - `references/THEME_DISCOVERY.md`
@@ -30,53 +31,76 @@ metadata:
 - `references/DESIGN_AGENT_RULES.md`
 - `references/RENDER_VISUAL_QA.md`
 - `references/GLOBAL_DESIGN_JURY.md`
+- `references/REGRESSION_GUARDRAILS.md`
 
-## Why v0.6 / 為什麼再升級
+## Core contracts / 核心契約
 
-v0.5 能抓內容、主色、placeholder、基本幾何與構圖問題，但「整齊」仍不等於「全球頂級」。
+1. **Content Lock** — protected semantics immutable。
+2. **Theme Lock** — 未授權不得 rebrand / light↔dark flip。
+3. **Bilingual Typography** — 繁中＋英文 glyph-safe、PowerPoint-safe、協調、可讀。
+4. **Layout Intelligence** — brand terrain、grid rails、spacing rhythm、reading order、visual balance、peer alignment 都是正式品質條件。
+5. **Deck Identity Guard** — final 必須仍明確屬於 source deck，不得模板化收斂。
+6. **Global Design Jury** — Purpose/Hierarchy/Simplicity/Craft、Executive Communication、Domain/Role Fit 三個 lens 全部通過。
+7. **No-regression transaction** — 修 A 不能壞 B；任何 repair 後都要重跑全簡報。
 
-v0.6 的關鍵原則：
+## Hard content lock / 內容 100% 凍結
 
-> **不是學 Apple 的皮，而是學 Purpose、Hierarchy、Simplicity、Craft 的苛刻程度；不是學顧問公司的模板，而是學 executive communication 的結構；不是學 technical keynote 的配色，而是學資訊密度與視覺焦點的控制。**
+禁止：
 
-世界級 final 必須讓每一頁都能回答：
+- rewrite / summarize / translate / spell-correct / expand / shorten
+- change text, punctuation, numbers, units, formulas
+- change table values or semantic structure
+- change chart source values/categories/series semantics
+- replace images/media or alter protected image crop semantics
+- add/delete/reorder/merge/split slides or protected content
+- silently normalize `20260819` → `2026/08/19`
 
-```text
-Why does this slide exist?
-What is the first thing to see?
-What is the second thing to see?
-Why is every element here?
-Why does this still unmistakably belong to the source deck?
-```
+允許：
+
+- x/y, width/height
+- font family/size/weight/color when content remains identical
+- margins, alignment, spacing, fill, border, background
+- table row/column sizing and visual styling
+- chart styling that does not change chart data
+- decorative native shapes with no protected semantic content
+
+如果內容塞不下：**先重排版，不准刪內容。**
 
 ## Full pipeline / 完整品質管線
 
 ```text
 SOURCE PPTX
+  → immutable backup
   → Content Snapshot
-  → Source Theme Discovery
-  → Source Render + Slide-role / Brand-terrain / Personality discovery
+  → Source Theme + Deck Identity + Brand Terrain discovery
+  → Source full render
+  → slide-role / family / peer-system discovery
   → PPTX Linter
   → Auto Formatter
   → Layout Intelligence / Spatial QA
-  → Design Agent — Skeleton before Skin
+  → Design Agent — Soul → Frame → Skeleton → Joints → Limbs → Skin
   → Content + Theme + Spatial Guards
-  → Render Visual QA
-  → Render Composition QA
+  → full render
+  → Visual QA
+  → Composition QA
   → Global Design Jury round 1
-  → repair / refine
+  → repair/refine
+  → full render of ALL slides
   → Global Design Jury round 2
-  → Regression v0.6
+  → production regression pass 3
+  → final full render of ALL slides
+  → Regression v0.6.1
   → FINAL PPTX
 ```
 
 ## 0. Preflight
 
-1. 能讀 source `.pptx`、寫 candidate、執行 scripts。
-2. 不覆寫 source。
+1. 不覆寫 source。
+2. 建立工作副本與 source content snapshot。
 3. 若 source 有 animation/transition/hyperlink/OLE/SmartArt/comments/accessibility metadata，優先原檔就地修改視覺屬性。
-4. 無 renderer 時只能 structural candidate，不能宣稱 v0.6 final。
-5. 不得先挑「漂亮模板」。先理解 source soul / audience / role。
+4. 無 renderer 時只能 structural candidate，不能宣稱 production final。
+5. 不得先挑「漂亮模板」；先理解 source soul / audience / role。
+6. 對 Windows/Office 交付，字型必須通過 portability review；不能只在生成環境正常。
 
 ## 1. Content Snapshot
 
@@ -84,62 +108,55 @@ SOURCE PPTX
 python scripts/pptx_content_lock.py snapshot source.pptx --out content_manifest.json
 ```
 
-## 2. Source Theme + Identity Discovery
+任何中途 repair 後都可以立即：
+
+```bash
+python scripts/pptx_content_lock.py verify source.pptx candidate.pptx
+```
+
+若 `CONTENT_LOCK_PASS=false`：立即停止該 candidate。
+
+## 2. Theme / Identity / Brand Terrain Discovery
 
 ```bash
 python scripts/pptx_theme_profile.py profile source.pptx --out theme_profile.json
 ```
 
-必須同時看 source render，記錄：
+同時看 source render，記錄：
 
 - light / dark / mixed
 - brand terrain / master chrome
-- recurring rails
+- recurring rails / baselines / gutters
 - typography character
 - density profile
-- image / chart language
-- recurring signature motifs
-- audience / slide roles
+- image/chart/table language
+- signature motifs
+- cover / agenda / section / data / comparison / closing roles
+- sibling families，例如 POWER / THD / HOHD、6σ / 5σ / 4σ、L/R
 
-若品牌識別烘焙在 full-slide layout/master image，render 才是權威。
+若 XML 與實際 render 衝突，以 render 為準。
 
-## 3. Source Spatial Discovery
-
-逐頁辨識：
-
-- slide role
-- brand-safe / content-safe zones
-- title / status / logo / footer reservations
-- peer systems
-- reading order
-- vertical balance
-- repeated rails / baselines / gutters
-
-不要把 cover、agenda、section、dense-data、keynote、brand editorial 套成同一種骨架。
-
-## 4. Linter
+## 3. Linter
 
 ```bash
 python scripts/pptx_lint.py source.pptx --json > lint.before.json
 ```
 
-抓 geometry、placeholder、tiny text、table density、CJK fallback、suspicious overlap 等。
+至少檢查：geometry、out-of-bounds、placeholder artifacts、tiny text、table density、CJK fallback、suspicious overlap。
 
-## 5. Auto Formatter
+## 4. Auto Formatter
 
-先修低風險機械問題：alignment、spacing、geometry、table sizing、text margins、chart plot area。
+先做低風險機械修復：
 
-每次修改後：
+- alignment / spacing
+- text margins
+- table row/column sizing
+- chart/image peer geometry
+- consistent status/title/footer rails
 
-```bash
-python scripts/pptx_content_lock.py verify source.pptx candidate.pptx
-python scripts/pptx_theme_profile.py compare source.pptx candidate.pptx --json
-python scripts/pptx_lint.py candidate.pptx --json > lint.after-format.json
-```
+每輪都執行 Content Verify + Theme Compare + Linter。
 
-## 6. Design Agent — Soul → Frame → Skeleton → Joints → Limbs → Skin
-
-依 `LAYOUT_INTELLIGENCE.md`：
+## 5. Design Agent — Skeleton before Skin
 
 ```text
 Soul
@@ -150,21 +167,57 @@ Soul
 → Skin
 ```
 
-不得從 Skin 開始。
+### Required behavior
 
-### Required design behavior
-
-- brand terrain 不被大面積 panel 壓住
+- brand terrain 不被大面積 panel 蓋住
 - title/status/logo 不互搶 header band
-- summary/table 共用合理 rails
-- peer charts / images 共用可解釋的尺寸、top/bottom rail、gutter
-- spacing 使用少數重複節奏
+- summary/table 共用可解釋的 rails
+- peer charts/images 共用尺寸、top/bottom rail、gutter，除非資料本質要求例外
+- spacing 只使用少數有節奏的 tiers
 - dense body 不無理由 top-heavy
-- decoration 必須服務 hierarchy / grouping / navigation / brand continuity
-- source `20260819` 不得為了美觀改成 `2026/08/19`
-- 不得把所有 deck 做成 rounded-card / dark-tech / gradient template
+- decoration 必須服務 hierarchy/grouping/navigation/brand continuity
+- 不得 rounded-card / dark-tech / gradient template convergence
+- cover、agenda、data、closing 不能共用錯誤骨架
 
-## 7. Spatial QA
+## 6. Sibling family parity / 同族頁一致性
+
+若 POWER 已套用成熟 table system，THD / HOHD 不得保留舊式裸表格。
+
+同族頁預設共享：
+
+- title rail
+- status rail
+- summary card system
+- table header/frequency/data-row hierarchy
+- table font, fill, border, padding language
+- chart title and L/R peer relationship
+- footer/brand reservation
+- spacing rhythm
+
+資料欄數不同只允許 geometry adaptation，不允許 visual language regression。
+
+## 7. Empty placeholder / master artifact rule
+
+Final render 不得出現或被空 placeholder 影響：
+
+- `presentation title`
+- `Event name or presentation title`
+- `Speaker name or subtitle`
+- `Click to add...`
+- empty title/body placeholder covering actual content
+- master `AGENDA` / `THANK YOU` 或類似 artifact 與有效內容競爭
+
+空 placeholder 沒有 protected content 時可移除；有效 source content 必須保留。
+
+## 8. Font portability / 雙語字型
+
+- Traditional Chinese + English 必須 glyph-safe。
+- 不能只看 XML font name；必須檢實際 Office-compatible render。
+- 若看到 serif fallback、巨大字體、裁切、行高異常、換行漂移：FAIL。
+- Windows/Office conservative fallback 優先使用 Aptos / Microsoft JhengHei 或已證明目標環境可用的 Noto Sans CJK TC。
+- 不為了美感使用客戶環境可能沒有的脆弱字型。
+
+## 9. Spatial QA
 
 ```bash
 python scripts/pptx_layout_intelligence.py source.pptx candidate.pptx --json
@@ -176,11 +229,11 @@ Hard requirement：
 SPATIAL_QA_PASS=true
 ```
 
-Warnings 必須在 Composition QA 被逐頁處理。
+Warnings 必須在 Composition QA 被逐頁解決或合理說明。
 
-## 8. Render Visual QA
+## 10. Full render + Visual QA
 
-Render source + final 全頁：
+Render source + final **所有頁面**。
 
 ```bash
 python scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
@@ -192,45 +245,34 @@ python scripts/visual_qa_gate.py visual_qa.json --expected-slides <N>
 VISUAL_QA_PASS=true
 ```
 
-## 9. Render Composition QA
+如果 automated PNG 與使用者實際 PowerPoint 預覽不一致，以實際 Office/PowerPoint 現象為優先 defect evidence。
+
+## 11. Composition QA
 
 逐頁評估：
 
-- brand chrome
-- occlusion
-- grid alignment
-- peer alignment
-- spacing rhythm
-- reading order
-- visual balance
-- slide-role fit
-- decorative restraint
+- brand chrome respected
+- no content occlusion
+- grid alignment coherent
+- peer components aligned
+- spacing rhythm coherent
+- reading order clear
+- visual balance coherent
+- slide-role composition fit
+- decorative elements earn their place
+- template placeholder artifacts absent
+- theme fidelity preserved
+- bilingual typography clean
 
 ```bash
 python scripts/composition_qa_gate.py composition_qa.json --expected-slides <N>
 ```
 
-必須：
+必須 `COMPOSITION_QA_PASS=true`。
 
-```text
-COMPOSITION_QA_PASS=true
-```
+## 12. Global Design Jury
 
-## 10. Global Design Jury / 世界級評審
-
-依 `GLOBAL_DESIGN_JURY.md` 產生 `global_design_jury.json`。
-
-### Three mandatory lenses
-
-```text
-purpose_hierarchy_craft
-executive_communication
-domain_role_fit
-```
-
-### Core world-class dimensions
-
-每頁至少評：
+依 `GLOBAL_DESIGN_JURY.md`，每頁至少評：
 
 ```text
 purpose
@@ -258,12 +300,9 @@ deck_jury_score >= 93
 identity_fidelity_score >= 95
 archetype_fit_score >= 92
 generic_template_risk <= 10
-review_rounds >= 2
 ```
 
-Role-specific dimensions 依 keynote / executive / technical / research / brand / comparison / section-closing 分別評估。
-
-執行：
+Round 1 與 Round 2 都必須覆蓋全部 slides，不能抽樣。
 
 ```bash
 python scripts/global_design_jury_gate.py global_design_jury.json --expected-slides <N>
@@ -276,27 +315,21 @@ DECK_IDENTITY_PASS=true
 GLOBAL_DESIGN_JURY_PASS=true
 ```
 
-### 3-second glance test
+## 13. Production three-pass full-deck review
 
-不要求 3 秒讀懂所有細節；要求 3 秒內能辨識：
-
-1. 這頁的任務
-2. 第一個 focal point
-3. 主要資訊結構
-
-## 11. Craft requires two review rounds
-
-v0.6 final 至少兩輪：
+v0.6.1 production workflow 至少：
 
 ```text
-render → jury round 1 → repair/refine → render → jury round 2
+Pass 1 = Soul / identity / theme / role
+Pass 2 = Skeleton + Muscle / layout / tables / charts / density
+Pass 3 = Skin + final regression / typography / craft / Office render
 ```
 
-第一輪若沒有修改，第二輪仍必須獨立重驗。
+每一輪都看 **全簡報所有頁**。
 
-不允許「一次生成 → 自己打 95 分 → final」。
+**Fix A without breaking B**：每次 repair 後都要 rerender 全頁並確認所有先前 PASS 的頁面沒有 regression。
 
-## 12. Regression v0.6
+## 14. Regression
 
 ```bash
 python scripts/pptx_regression.py source.pptx candidate.pptx \
@@ -305,7 +338,7 @@ python scripts/pptx_regression.py source.pptx candidate.pptx \
   --global-jury-report global_design_jury.json --require-global-jury
 ```
 
-Fully qualified v0.6 final **只接受**：
+Fully qualified production final 只接受：
 
 ```text
 CONTENT_LOCK_PASS=true
@@ -320,31 +353,21 @@ REGRESSION_V06_PASS=true
 DELIVERY_V06_PASS=true
 ```
 
-Legacy `DELIVERY_PASS=true` / `DELIVERY_V05_PASS=true` 不得作為 v0.6 世界級 final 證明。
-
-## 13. Benchmark / Style Diversity
-
-發佈前應參考：
+另外 production review 必須人工/agent evidence 證明：
 
 ```text
-docs/GLOBAL_DESIGN_BENCHMARK_V06.md
+EMPTY_PLACEHOLDER_PASS=true
+FONT_PORTABILITY_PASS=true
+SIBLING_STYLE_PARITY_PASS=true
+FULL_DECK_REGRESSION_PASS=true
+THREE_PASS_REVIEW_PASS=true
 ```
 
-至少壓測：
+這五項任一無法證明：FAIL CLOSED。
 
-- keynote launch minimal
-- executive strategy
-- technical keynote / engineering review
-- luxury / editorial brand
-- research / academic evidence-led
+## 15. Fail closed
 
-加上真實 MEC / KORE regression anchors。
-
-如果五種 deck 最後看起來只是同一套模板換顏色：FAIL。
-
-## 14. Fail closed
-
-遇到 verifier 無法判定、render 失敗、brand terrain 不清楚、font fallback 不可控、任何 v0.6 Gate 未通過：
+遇到 verifier 無法判定、render 失敗、brand terrain 不清楚、font fallback 不可控、任何 Gate 未通過：
 
 - 保留 source 與最近 Content-Lock-safe candidate
 - 回報 slide number + failed gate
@@ -353,25 +376,10 @@ docs/GLOBAL_DESIGN_BENCHMARK_V06.md
 ## Minimal activation / 最短啟用語句
 
 ```text
-Use pptx-beautify-lock v0.6 Global Design Jury on this PPTX.
+Use pptx-beautify-lock v0.6.1 strict production workflow on this PPTX.
 內容 100% 凍結，不 rebrand、不套通用模板。
-先分析 Source Theme + Brand Terrain + Deck Identity + Layout Skeleton，再美化。
-執行 Linter → Auto Formatter → Spatial QA → Design Agent → Render Visual QA → Composition QA → Global Design Jury ×2 → Regression v0.6。
-只有 DELIVERY_V06_PASS=true 才交付 final。
-```
-
-## Final report
-
-```text
-OUTPUT=<path>
-CONTENT_LOCK_PASS=true|false
-THEME_FIDELITY_PASS=true|false
-SPATIAL_QA_PASS=true|false
-LAYOUT_QA_PASS=true|false
-VISUAL_QA_PASS=true|false
-COMPOSITION_QA_PASS=true|false
-DECK_IDENTITY_PASS=true|false
-GLOBAL_DESIGN_JURY_PASS=true|false
-REGRESSION_V06_PASS=true|false
-DELIVERY_V06_PASS=true|false
+先分析 Source Theme + Brand Terrain + Deck Identity + Layout Skeleton。
+執行全頁三輪：Soul → Skeleton/Muscle → Skin/Regression。
+任何 repair 後都 rerender 全份，禁止修 A 壞 B。
+只有 DELIVERY_V06_PASS=true 且 v0.6.1 五項 production guardrails 全 PASS 才交付 final。
 ```

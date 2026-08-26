@@ -1,7 +1,7 @@
 {
   "name": "pptx-beautify-lock",
-  "version": "0.6.0",
-  "description": "Source-faithful PowerPoint beautification with hard Content Lock, Theme Discovery/Guard, Traditional Chinese + English typography, Layout Intelligence, Spatial QA, rendered Visual QA, Composition QA, Deck Identity Guard, Global Design Jury, and Regression v0.6.",
+  "version": "0.6.1",
+  "description": "Source-faithful PowerPoint beautification with hard Content Lock, Theme/Identity Lock, bilingual font portability, Layout Intelligence, Spatial/Composition QA, Deck Identity Guard, Global Design Jury, three-pass full-deck review, and strict no-regression production gates.",
   "author": {
     "name": "Space653000",
     "url": "https://github.com/Space653000"
@@ -21,6 +21,8 @@
     "composition-qa",
     "global-design-jury",
     "deck-identity",
+    "full-deck-regression",
+    "font-portability",
     "world-class-presentations",
     "traditional-chinese",
     "bilingual-typography",
