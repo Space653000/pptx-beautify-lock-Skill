@@ -22,6 +22,15 @@ from tkinter import filedialog, messagebox, ttk
 APP_TITLE = "PPTX Beautify v0.6.2"
 CANONICAL_SKILL_URL = "https://github.com/Space653000/pptx-beautify-lock-Skill"
 
+# Stable product contract used by the compiled EXE self-test. These flags are
+# intentionally explicit so the test does not depend on source files being
+# recoverable from inside a PyInstaller bundle.
+PRODUCT_FEATURES = ("input_pptx", "output_pptx", "style", "beautify")
+SKILL_INSTALL_ENABLED = False
+REPOSITORY_BOOTSTRAP_ENABLED = False
+BACKUP_ENABLED = False
+AGENT_MODE_SELECTOR_ENABLED = False
+
 STYLE_PRESETS = [
     "自動（忠於原稿 / Source-faithful）",
     "專業技術（Technical Clean）",
