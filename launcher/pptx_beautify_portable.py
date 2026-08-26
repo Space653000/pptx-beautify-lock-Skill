@@ -183,6 +183,38 @@ def run_local_structural_guards(
     return ok
 
 
+def _portable_self_test() -> int:
+    """Exercise the exact in-EXE Python/PPTX runtime without opening the GUI."""
+    logs: list[str] = []
+    try:
+        # These imports execute at module import time too; referencing their
+        # versions here makes the bundled dependency check explicit.
+        if not getattr(pptx, "__version__", None):
+            return 10
+        if not getattr(PIL, "__version__", None):
+            return 11
+
+        with tempfile.TemporaryDirectory(prefix="pptx-beautify-selftest-") as tmp:
+            root = Path(tmp)
+            probe = root / "runtime_probe.py"
+            probe.write_text(
+                "from pptx import Presentation\n"
+                "p = Presentation()\n"
+                "assert len(p.slides) == 0\n"
+                "print('PORTABLE_RUNTIME_SELF_TEST_PASS=true')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+            rc = _run_python_script(probe, [], root, logs.append)
+            if rc != 0:
+                return 12
+            if "PORTABLE_RUNTIME_SELF_TEST_PASS=true" not in logs:
+                return 13
+        return 0
+    except Exception:
+        return 14
+
+
 # Patch the thin GUI's execution seams. All UI and release policy stay canonical
 # to pptx_beautify_gui.py; only runtime/bootstrap mechanics change here.
 core.update_canonical_repo = _download_main_checkout
@@ -191,4 +223,6 @@ core.run_local_structural_guards = run_local_structural_guards
 
 
 if __name__ == "__main__":
+    if "--portable-self-test" in sys.argv:
+        raise SystemExit(_portable_self_test())
     core.App().mainloop()
