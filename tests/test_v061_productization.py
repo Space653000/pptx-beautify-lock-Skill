@@ -11,18 +11,25 @@ class V061ProductizationTests(unittest.TestCase):
         self.assertTrue(launcher.is_file())
         py_compile.compile(str(launcher), doraise=True)
 
-    def test_launcher_requires_full_deck_regression_and_dual_review(self):
+    def test_launcher_is_beautify_only_and_points_to_canonical_skill_url(self):
         text = (ROOT / "launcher" / "pptx_beautify_gui.py").read_text(encoding="utf-8")
         for required in [
-            "Fix A without breaking B",
-            "THREE full-deck review passes",
-            "Dual: Claude → Codex",
-            "Dual: Codex → Claude",
-            "CONTENT_LOCK_PASS=true",
-            "GLOBAL_DESIGN_JURY_PASS=true",
-            "DELIVERY_V06_PASS=true",
+            "https://github.com/Space653000/pptx-beautify-lock-Skill",
+            "1. 輸入 PPTX",
+            "2. 輸出 PPTX",
+            "3. 美化風格",
+            "開始美化",
+            "open and read this canonical Skill repository",
         ]:
             self.assertIn(required, text)
+        for forbidden in [
+            "安裝 / 更新 Skill",
+            "全面備份",
+            "Dual: Claude → Codex",
+            "Dual: Codex → Claude",
+            "backup_to_windows.ps1",
+        ]:
+            self.assertNotIn(forbidden, text)
 
     def test_strict_guardrails_exist(self):
         guard = (ROOT / "pptx-beautify-lock" / "references" / "REGRESSION_GUARDRAILS.md").read_text(encoding="utf-8")
@@ -43,11 +50,14 @@ class V061ProductizationTests(unittest.TestCase):
         self.assertIn("FULL_DECK_REGRESSION_PASS=true", skill)
         self.assertIn("FONT_PORTABILITY_PASS=true", skill)
 
-    def test_windows_backup_target_is_pinned(self):
-        ps1 = (ROOT / "scripts" / "backup_to_windows.ps1").read_text(encoding="utf-8")
-        self.assertIn(r"C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil", ps1)
-        self.assertIn("fast-forward only", ps1)
-        self.assertIn("refuses to overwrite", ps1)
+    def test_backup_is_standalone_bat_next_to_repo_root(self):
+        bat = ROOT / "BACKUP-pptx-beautify-lock-Skill.bat"
+        self.assertTrue(bat.is_file())
+        text = bat.read_text(encoding="utf-8")
+        self.assertIn("%~dp0pptx-beautify-lock-Skill", text)
+        self.assertIn("git clone", text)
+        self.assertIn("pull --ff-only", text)
+        self.assertFalse((ROOT / "scripts" / "backup_to_windows.ps1").exists())
 
 
 if __name__ == "__main__":

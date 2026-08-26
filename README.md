@@ -2,58 +2,50 @@
 
 **繁體中文為主 / English compatible**
 
-給 Claude Code、ChatGPT / Codex 與其他 Agent 使用的 **PowerPoint 內容 100% 凍結＋來源風格鎖定＋版面骨骼智慧＋世界級 Global Design Jury＋全簡報回歸防護** Skill。
+給 Claude Code、ChatGPT / Codex 與其他 Agent 使用的 **PowerPoint 內容凍結＋來源風格鎖定＋版面智慧＋全簡報回歸防護** Skill。
 
 核心原則：
 
 > **Fix A without breaking B.** 任何 repair 後都要重新 render / review 全部 slides，不能修好一頁又弄壞另一頁。
 
-## 1. 只貼中央 Skill Catalog URL
+## 1. Canonical Skill URL
 
-未來只需要貼：
-
-```text
-https://github.com/Space653000/Claude-code-ChatGPT-Codex---SKILL
-```
-
-安裝中央 Catalog 後，Claude Code / Codex 會自動看到 `pptx-beautify-lock` wrapper；遇到 PPTX 任務時它會自動 bootstrap/update 這個 canonical repo，不需要再記第二個網址。
-
-Canonical Source of Truth 仍是：
+這個 repository 就是唯一 canonical Skill source：
 
 ```text
 https://github.com/Space653000/pptx-beautify-lock-Skill
 ```
 
-## 2. Windows 一鍵檔案介面
+要讓 AI 使用時，直接把這個 URL 給 Claude Code / Codex / ChatGPT，要求它先讀取最新版 `main` 再執行 PPTX 工作即可。
 
-原始碼版：
+本 repo 不需要依賴另一個中央 Skill Catalog 才能成立，也不把 GUI、備份流程當成 Skill 本體。
 
-```text
-PPTX-Beautify-Lock.cmd
-```
+## 2. 三個產品邊界完全分開
 
-GUI 可直接：
+### A. Skill
 
-- 選擇本機 `.pptx`
-- 選輸出資料夾
-- Claude Code only / Codex only
-- **Dual: Claude → Codex**（建議）
-- Dual: Codex → Claude
-- 安裝 / 更新 Skill
-- 執行頂級美化
-- 全面備份
+只存在並維護在這個 GitHub repository。它定義 PPTX beautification / Content Lock / Theme Fidelity / QA / Regression 規則。
+
+### B. Windows Beautifier EXE
+
+`PPTX-Beautify.exe` 只負責：
+
+1. 任意選擇輸入 `.pptx`
+2. 任意指定輸出 `.pptx`
+3. 選擇或輸入美化風格
+4. 按下 **開始美化**
+
+EXE 不安裝 Skill、不更新 Skill、不備份 GitHub。它只要求可用的 AI Agent 直接開啟上面的 canonical Skill URL，然後依規則處理投影片。
 
 詳細說明：[`launcher/README.md`](launcher/README.md)
 
-GitHub Actions `build-windows-launcher` 會在 Windows runner 建立：
+### C. Standalone GitHub Backup BAT
 
-```text
-PPTX-Beautify-Lock.exe
-```
+`BACKUP-pptx-beautify-lock-Skill.bat` 是完全獨立的雙擊工具，只負責把這個 GitHub repository 完整抓到 BAT 所在資料夾。
 
-下載 Actions artifact `PPTX-Beautify-Lock-Windows` 即可使用，不需自己打包 PyInstaller。
+它不啟動 PPTX 美化，也不啟動 Skill 安裝。
 
-## 3. v0.6.1 Strict Production Contract
+## 3. Strict Production Contract
 
 ```text
 Content Snapshot
@@ -110,11 +102,6 @@ DECK_IDENTITY_PASS=true
 GLOBAL_DESIGN_JURY_PASS=true
 REGRESSION_V06_PASS=true
 DELIVERY_V06_PASS=true
-```
-
-另外 v0.6.1 production evidence 要證明：
-
-```text
 EMPTY_PLACEHOLDER_PASS=true
 FONT_PORTABILITY_PASS=true
 SIBLING_STYLE_PARITY_PASS=true
@@ -124,34 +111,40 @@ THREE_PASS_REVIEW_PASS=true
 
 任一無法證明：FAIL CLOSED。
 
-## 6. 獨立安裝 canonical Skill
+## 6. Build Windows beautifier
 
-```bash
-python scripts/install_skill.py --target both --force
-```
-
-成功：
+GitHub Actions workflow：
 
 ```text
-INSTALL_PASS=true
+build-windows-launcher
 ```
 
-## 7. Windows 全面備份
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\backup_to_windows.ps1
-```
-
-預設完整備份到：
+會建立：
 
 ```text
-C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil
+PPTX-Beautify.exe
 ```
 
-中央 Catalog 同步備份到：
+artifact 名稱：
 
 ```text
-C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil\_catalog\Claude-code-ChatGPT-Codex---SKILL
+PPTX-Beautify-Windows
 ```
 
-採 fast-forward only；有本地修改就停止，不強制覆寫。
+## 7. Standalone backup
+
+把：
+
+```text
+BACKUP-pptx-beautify-lock-Skill.bat
+```
+
+放到想保存 backup 的 Windows 資料夾，雙擊即可。
+
+它會在 BAT 同層建立／更新：
+
+```text
+pptx-beautify-lock-Skill\
+```
+
+使用完整 Git clone，因此保留 repository 與 Git history；再次執行採 fast-forward only，不強制覆寫本地修改。
