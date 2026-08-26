@@ -1,110 +1,103 @@
-# pptx-beautify-lock-Skill v0.6
+# pptx-beautify-lock-Skill v0.6.1
 
 **繁體中文為主 / English compatible**
 
-給 Claude Code、ChatGPT / Codex 與其他 Agent 使用的 **PowerPoint 內容 100% 凍結＋來源風格鎖定＋版面骨骼智慧＋世界級 Global Design Jury** Skill。
+給 Claude Code、ChatGPT / Codex 與其他 Agent 使用的 **PowerPoint 內容 100% 凍結＋來源風格鎖定＋版面骨骼智慧＋世界級 Global Design Jury＋全簡報回歸防護** Skill。
 
-> **Content Lock**：文字、數字、表格資料、圖表資料、圖片內容、頁面順序與 protected semantics 不得擅自改。  
-> **Theme / Identity Lock**：未授權不得 rebrand，也不得把不同 deck 洗成同一種 AI 模板。  
-> **Layout Intelligence**：沒有 overlap 還不夠；grid、spacing、reading order、visual balance、peer alignment 都要成立。  
-> **Global Design Jury**：不模仿 Apple/NVIDIA/顧問公司的皮，而是用 Purpose、Hierarchy、Simplicity、Craft、Executive Communication、Technical Focus 的世界級標準驗收。
+核心原則：
 
-## v0.6 核心理念
+> **Fix A without breaking B.** 任何 repair 後都要重新 render / review 全部 slides，不能修好一頁又弄壞另一頁。
+
+## 1. 只貼中央 Skill Catalog URL
+
+未來只需要貼：
 
 ```text
-Soul / 靈魂
-→ Frame / 框架
-→ Skeleton / 骨骼
-→ Joints / 關節
-→ Limbs / 肢體
-→ Skin / 外觀
-→ Global Design Jury / 世界級評審
+https://github.com/Space653000/Claude-code-ChatGPT-Codex---SKILL
 ```
 
-先理解 source 的品牌、內容任務、audience、density 與空間 DNA，最後才碰顏色、卡片、陰影、漸層等表皮。
+安裝中央 Catalog 後，Claude Code / Codex 會自動看到 `pptx-beautify-lock` wrapper；遇到 PPTX 任務時它會自動 bootstrap/update 這個 canonical repo，不需要再記第二個網址。
 
-## 完整流程
+Canonical Source of Truth 仍是：
+
+```text
+https://github.com/Space653000/pptx-beautify-lock-Skill
+```
+
+## 2. Windows 一鍵檔案介面
+
+原始碼版：
+
+```text
+PPTX-Beautify-Lock.cmd
+```
+
+GUI 可直接：
+
+- 選擇本機 `.pptx`
+- 選輸出資料夾
+- Claude Code only / Codex only
+- **Dual: Claude → Codex**（建議）
+- Dual: Codex → Claude
+- 安裝 / 更新 Skill
+- 執行頂級美化
+- 全面備份
+
+詳細說明：[`launcher/README.md`](launcher/README.md)
+
+GitHub Actions `build-windows-launcher` 會在 Windows runner 建立：
+
+```text
+PPTX-Beautify-Lock.exe
+```
+
+下載 Actions artifact `PPTX-Beautify-Lock-Windows` 即可使用，不需自己打包 PyInstaller。
+
+## 3. v0.6.1 Strict Production Contract
 
 ```text
 Content Snapshot
-→ Source Theme + Deck Identity Discovery
-→ Source Render / Brand Terrain / Slide-role Discovery
-→ PPTX Linter
+→ Source Theme + Deck Identity + Brand Terrain
+→ full source render
+→ Linter
 → Auto Formatter
-→ Layout Intelligence / Spatial QA
+→ Layout Intelligence
 → Design Agent
-→ Content + Theme + Spatial Guards
-→ Render Visual QA
+→ Content / Theme / Spatial Guards
+→ full render
+→ Visual QA
 → Composition QA
-→ Global Design Jury round 1
+→ Global Design Jury
 → repair / refine
-→ Global Design Jury round 2
-→ Regression v0.6
+→ full-deck rerender
+→ independent full-deck review
+→ final full-deck rerender
+→ Regression
 ```
 
-## Global Design Jury
-
-每份 final 同時通過三個 lens：
+Production workflow 至少三輪完整審查：
 
 ```text
-Purpose / Hierarchy / Simplicity / Craft
-Executive Communication
-Domain / Slide-role Fit
+Pass 1 = Soul / 靈魂
+Pass 2 = Skeleton + Muscle / 骨骼＋肌肉
+Pass 3 = Skin + Regression / 表皮＋回歸
 ```
 
-每頁核心評分至少包含：
+每一輪都必須覆蓋 **所有 slides**。
 
-```text
-purpose
-hierarchy
-simplicity
-craft
-composition
-typography
-spacing_rhythm
-color_discipline
-source_identity
-signal_to_noise
-glance_readability
-executive_readiness
-```
+## 4. 特別強化的 release blockers
 
-Default world-class floors：
+- **Empty placeholder purge** — 空 title/body placeholder、`presentation title`、`Speaker name or subtitle` 等不得擋有效內容。
+- **Font portability** — 繁中＋英文要在 Windows/PowerPoint 實際可用；serif fallback、巨大字體、裁切、換行漂移直接 FAIL。
+- **Sibling data-slide parity** — POWER / THD / HOHD、6σ / 5σ / 4σ、L/R 等同族頁要共享成熟 table/chart visual grammar。
+- **Brand terrain isolation** — logo、department identity、tagline、master chrome 不被新 panel 壓住。
+- **Full-deck regression** — 修任何一頁後重新 render / review 全簡報，確認先前通過頁面沒退化。
 
-```text
-every core dimension >= 90
-source_identity >= 95
-craft >= 92
-slide_jury_score >= 93
-deck_jury_score >= 93
-identity_fidelity_score >= 95
-archetype_fit_score >= 92
-generic_template_risk <= 10
-review_rounds >= 2
-```
+完整規則：[`pptx-beautify-lock/references/REGRESSION_GUARDRAILS.md`](pptx-beautify-lock/references/REGRESSION_GUARDRAILS.md)
 
-## Authoritative entry points / 權威入口
+## 5. Final Gates
 
-```text
-pptx-beautify-lock/SKILL.md
-```
-
-核心 references：
-
-```text
-pptx-beautify-lock/references/CONTENT_LOCK.md
-pptx-beautify-lock/references/THEME_DISCOVERY.md
-pptx-beautify-lock/references/TYPOGRAPHY_BILINGUAL.md
-pptx-beautify-lock/references/LAYOUT_INTELLIGENCE.md
-pptx-beautify-lock/references/GLOBAL_DESIGN_JURY.md
-```
-
-研究依據：[`docs/DESIGN_RESEARCH_V06_GLOBAL_JURY.md`](docs/DESIGN_RESEARCH_V06_GLOBAL_JURY.md)  
-五種風格 benchmark：[`docs/GLOBAL_DESIGN_BENCHMARK_V06.md`](docs/GLOBAL_DESIGN_BENCHMARK_V06.md)
-
-## v0.6 最終交付門檻
-
-Fully qualified final PPTX 必須：
+Fully qualified final 必須至少：
 
 ```text
 CONTENT_LOCK_PASS=true
@@ -119,33 +112,21 @@ REGRESSION_V06_PASS=true
 DELIVERY_V06_PASS=true
 ```
 
-`DELIVERY_PASS=true` / `DELIVERY_V05_PASS=true` 都只是舊版相容欄位，不代表 v0.6 世界級 final。
-
-## 最快使用：直接貼 GitHub URL
+另外 v0.6.1 production evidence 要證明：
 
 ```text
-https://github.com/Space653000/pptx-beautify-lock-Skill
+EMPTY_PLACEHOLDER_PASS=true
+FONT_PORTABILITY_PASS=true
+SIBLING_STYLE_PARITY_PASS=true
+FULL_DECK_REGRESSION_PASS=true
+THREE_PASS_REVIEW_PASS=true
 ```
 
-再告訴 Agent：
+任一無法證明：FAIL CLOSED。
 
-```text
-Use pptx-beautify-lock v0.6 Global Design Jury on this PPTX.
-內容 100% 凍結，不 rebrand、不套通用模板。
-先分析 Source Theme + Brand Terrain + Deck Identity + Layout Skeleton，再美化。
-只有 DELIVERY_V06_PASS=true 才交付 final。
-```
-
-若宿主允許本機寫入與程式執行：
+## 6. 獨立安裝 canonical Skill
 
 ```bash
-# Claude Code
-python scripts/install_skill.py --target claude --force
-
-# Codex
-python scripts/install_skill.py --target codex --force
-
-# Both
 python scripts/install_skill.py --target both --force
 ```
 
@@ -155,15 +136,22 @@ python scripts/install_skill.py --target both --force
 INSTALL_PASS=true
 ```
 
-> 單純貼 URL 不能繞過宿主安全權限。若禁止下載、執行或寫入 Skills 目錄，Agent 必須直接從 repo 使用 Skill，並明確回報「未持久安裝」。
+## 7. Windows 全面備份
 
-## Plugin 安裝
-
-### Claude Code
-
-```bash
-claude plugin marketplace add https://github.com/Space653000/pptx-beautify-lock-Skill
-claude plugin install pptx-beautify-lock@space653000-pptx
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\backup_to_windows.ps1
 ```
 
-完整安裝與 URL bootstrap 說明：[`INSTALL.md`](INSTALL.md) / [`AI_BOOTSTRAP.md`](AI_BOOTSTRAP.md)
+預設完整備份到：
+
+```text
+C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil
+```
+
+中央 Catalog 同步備份到：
+
+```text
+C:\0\_Infinite\_AI\01\_Projects\pptx-beautify-lock-Skil\_catalog\Claude-code-ChatGPT-Codex---SKILL
+```
+
+採 fast-forward only；有本地修改就停止，不強制覆寫。
