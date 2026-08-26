@@ -18,24 +18,39 @@ https://github.com/Space653000/pptx-beautify-lock-Skill
 
 要讓 AI 使用時，直接把這個 URL 給 Claude Code / Codex / ChatGPT，要求它先讀取最新版 `main` 再執行 PPTX 工作即可。
 
-本 repo 不需要依賴另一個中央 Skill Catalog 才能成立，也不把 GUI、備份流程當成 Skill 本體。
+本 repo 不需要依賴另一個中央 Skill Catalog 才能成立。
 
 ## 2. 三個產品邊界完全分開
 
-### A. Skill
+### A. Skill — AI Agent 路徑
 
 只存在並維護在這個 GitHub repository。它定義 PPTX beautification / Content Lock / Theme Fidelity / QA / Regression 規則。
 
-### B. Windows Beautifier EXE
+AI Agent 可直接讀這個 URL，使用完整 v0.6.1 Strict Production / Global Design Jury 能力。
 
-`PPTX-Beautify.exe` 只負責：
+### B. Windows Offline Beautifier EXE — 完全本機路徑
+
+`PPTX-Beautify-Offline.exe` 是另一個**完全離線、規則式、可重現**的本機工具，只負責：
 
 1. 任意選擇輸入 `.pptx`
 2. 任意指定輸出 `.pptx`
-3. 選擇或輸入美化風格
-4. 按下 **開始美化**
+3. 選擇美化風格
+4. 按下 **開始離線美化**
 
-EXE 不安裝 Skill、不更新 Skill、不備份 GitHub。它只要求可用的 AI Agent 直接開啟上面的 canonical Skill URL，然後依規則處理投影片。
+執行時：
+
+```text
+不呼叫外部 AI
+不讀 GitHub
+不發 HTTP request
+不需要網路
+不需要 Git
+不需要外部 Python
+```
+
+EXE 內建 `python-pptx` / Pillow / lxml 與 semantic Content Lock helper，採 deterministic local engine 做 placeholder cleanup、字體安全化、table parity、source accent、high-confidence cover/data-slide layout repair，最後以 Content Lock fail closed。
+
+**重要界線：**完全離線版沒有大型語言／視覺模型，所以不是雲端 AI 的離線替身。它適合工程簡報的大量結構整理、一致化與保守美化；需要 bespoke art direction / 深度語意判斷時，仍使用上面的 canonical Skill URL 讓 AI Agent 執行。
 
 詳細說明：[`launcher/README.md`](launcher/README.md)
 
@@ -45,7 +60,7 @@ EXE 不安裝 Skill、不更新 Skill、不備份 GitHub。它只要求可用的
 
 它不啟動 PPTX 美化，也不啟動 Skill 安裝。
 
-## 3. Strict Production Contract
+## 3. Strict Production Contract（AI Skill）
 
 ```text
 Content Snapshot
@@ -87,9 +102,9 @@ Pass 3 = Skin + Regression / 表皮＋回歸
 
 完整規則：[`pptx-beautify-lock/references/REGRESSION_GUARDRAILS.md`](pptx-beautify-lock/references/REGRESSION_GUARDRAILS.md)
 
-## 5. Final Gates
+## 5. AI Skill Final Gates
 
-Fully qualified final 必須至少：
+Fully qualified AI final 必須至少：
 
 ```text
 CONTENT_LOCK_PASS=true
@@ -111,7 +126,7 @@ THREE_PASS_REVIEW_PASS=true
 
 任一無法證明：FAIL CLOSED。
 
-## 6. Build Windows beautifier
+## 6. Build Windows offline beautifier
 
 GitHub Actions workflow：
 
@@ -122,14 +137,16 @@ build-windows-launcher
 會建立：
 
 ```text
-PPTX-Beautify.exe
+PPTX-Beautify-Offline.exe
 ```
 
-artifact 名稱：
+artifact：
 
 ```text
-PPTX-Beautify-Windows
+PPTX-Beautify-Offline-Windows
 ```
+
+Windows runner 必須真的執行 compiled EXE self-test。Self-test 會建立臨時 PPTX → 本機美化 → semantic Content Lock → 重新開啟輸出；未通過不得上傳 artifact。
 
 ## 7. Standalone backup
 

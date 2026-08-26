@@ -9,7 +9,7 @@ on:
       - 'release/**'
     paths:
       - 'launcher/**'
-      - 'BACKUP-pptx-beautify-lock-Skill.bat'
+      - 'pptx-beautify-lock/scripts/pptx_content_lock.py'
       - '.github/workflows/build-windows-launcher.yml'
 
 jobs:
@@ -24,37 +24,46 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install PyInstaller
-        run: python -m pip install --upgrade pyinstaller
+      - name: Install offline runtime and PyInstaller
+        run: python -m pip install --upgrade pyinstaller python-pptx Pillow lxml
 
-      - name: Build beautify-only GUI executable
+      - name: Build offline beautifier executable
         shell: pwsh
         run: >-
           pyinstaller --noconfirm --clean --onefile --windowed
-          --name PPTX-Beautify
+          --name PPTX-Beautify-Offline
           --paths launcher
+          --paths pptx-beautify-lock/scripts
+          --hidden-import pptx_content_lock
           launcher/pptx_beautify_portable.py
 
-      - name: Execute product-boundary self-test
+      - name: Execute compiled offline self-test
         shell: pwsh
         run: |
-          if (-not (Test-Path 'dist/PPTX-Beautify.exe')) { throw 'EXE missing' }
-          $process = Start-Process -FilePath (Resolve-Path 'dist/PPTX-Beautify.exe') -ArgumentList '--portable-self-test' -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "EXE self-test failed with exit code $($process.ExitCode)" }
+          if (-not (Test-Path 'dist/PPTX-Beautify-Offline.exe')) { throw 'EXE missing' }
+          $process = Start-Process -FilePath (Resolve-Path 'dist/PPTX-Beautify-Offline.exe') -ArgumentList '--portable-self-test' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Offline EXE self-test failed with exit code $($process.ExitCode)" }
+
+      - name: Assert cloud-agent strings are not part of launcher source
+        shell: pwsh
+        run: |
+          $gui = Get-Content 'launcher/pptx_beautify_gui.py' -Raw
+          if ($gui -match 'subprocess\.Popen|claude\.CMD|codex exec|PROMPT_TEMPLATE|CANONICAL_SKILL_URL') {
+            throw 'Cloud-agent launcher logic still present'
+          }
 
       - name: Hash release executable
         shell: pwsh
         run: |
-          $hash = Get-FileHash 'dist/PPTX-Beautify.exe' -Algorithm SHA256
+          $hash = Get-FileHash 'dist/PPTX-Beautify-Offline.exe' -Algorithm SHA256
           $hash | Format-List
           "SHA256=$($hash.Hash)" | Out-File -Encoding ascii 'dist/SHA256.txt'
 
-      - name: Upload Windows beautifier
+      - name: Upload offline Windows beautifier
         uses: actions/upload-artifact@v4
         with:
-          name: PPTX-Beautify-Windows
+          name: PPTX-Beautify-Offline-Windows
           path: |
-            dist/PPTX-Beautify.exe
+            dist/PPTX-Beautify-Offline.exe
             dist/SHA256.txt
-            BACKUP-pptx-beautify-lock-Skill.bat
           if-no-files-found: error

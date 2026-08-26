@@ -5,18 +5,19 @@ from pathlib import Path
 import sys
 import unittest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 GUI = ROOT / "launcher" / "pptx_beautify_gui.py"
+ENGINE = ROOT / "launcher" / "pptx_offline_engine.py"
 PORTABLE = ROOT / "launcher" / "pptx_beautify_portable.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "build-windows-launcher.yml"
 BACKUP_BAT = ROOT / "BACKUP-pptx-beautify-lock-Skill.bat"
 
 
 def load_portable():
-    launcher = str(ROOT / "launcher")
-    if launcher not in sys.path:
-        sys.path.insert(0, launcher)
+    for path in (ROOT / "launcher", ROOT / "pptx-beautify-lock" / "scripts"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
     spec = importlib.util.spec_from_file_location("pptx_beautify_portable_test", PORTABLE)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -34,38 +35,41 @@ class PortableLauncherTests(unittest.TestCase):
         self.assertIn("1. 輸入 PPTX", text)
         self.assertIn("2. 輸出 PPTX", text)
         self.assertIn("3. 美化風格", text)
-        self.assertIn("開始美化", text)
+        self.assertIn("開始離線美化", text)
         self.assertIn("asksaveasfilename", text)
         self.assertNotIn("安裝 / 更新 Skill", text)
         self.assertNotIn("全面備份", text)
         self.assertNotIn("執行模式", text)
 
-    def test_gui_reads_canonical_skill_url_without_install_or_repo_bootstrap(self):
-        text = GUI.read_text(encoding="utf-8")
-        self.assertIn(
-            "https://github.com/Space653000/pptx-beautify-lock-Skill",
-            text,
-        )
-        self.assertIn("open and read this canonical Skill repository", text)
-        self.assertNotIn("install_from_checkout", text)
-        self.assertNotIn("update_canonical_repo", text)
-        self.assertNotIn("backup_to_windows.ps1", text)
-        self.assertNotIn("git clone", text.lower())
+    def test_runtime_is_zero_cloud_and_does_not_read_github(self):
+        gui = GUI.read_text(encoding="utf-8")
+        engine = ENGINE.read_text(encoding="utf-8")
+        combined = gui + "\n" + engine
+        self.assertIn("OFFLINE_ONLY = True", gui)
+        self.assertIn("CLOUD_AI_ENABLED = False", gui)
+        self.assertIn("NETWORK_REQUIRED = False", gui)
+        for forbidden in (
+            "subprocess.Popen", "shutil.which", "claude.CMD", "codex exec",
+            "PROMPT_TEMPLATE", "CANONICAL_SKILL_URL", "urllib", "requests.get",
+        ):
+            self.assertNotIn(forbidden, combined)
+        self.assertIn("beautify_pptx", gui)
+        self.assertIn("CONTENT_LOCK_FAIL", engine)
 
-    def test_backup_is_a_separate_double_click_bat(self):
+    def test_backup_remains_a_separate_double_click_bat(self):
         text = BACKUP_BAT.read_text(encoding="utf-8")
         self.assertIn("%~dp0pptx-beautify-lock-Skill", text)
         self.assertIn("git clone", text)
         self.assertIn("fetch --all --tags --prune", text)
         self.assertIn("pull --ff-only", text)
 
-    def test_windows_build_is_minimal_and_self_tests_compiled_exe(self):
+    def test_windows_build_bundles_local_pptx_runtime_and_self_tests_exe(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("launcher/pptx_beautify_portable.py", workflow)
-        self.assertIn("--name PPTX-Beautify", workflow)
+        self.assertIn("python-pptx Pillow lxml", workflow)
+        self.assertIn("--name PPTX-Beautify-Offline", workflow)
+        self.assertIn("--hidden-import pptx_content_lock", workflow)
         self.assertIn("--portable-self-test", workflow)
-        self.assertNotIn("--collect-all pptx", workflow)
-        self.assertNotIn("-r requirements.txt", workflow)
+        self.assertNotIn("BACKUP-pptx-beautify-lock-Skill.bat", workflow)
 
 
 if __name__ == "__main__":
