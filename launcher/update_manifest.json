@@ -1,6 +1,6 @@
 {
   "channel": "fix/separate-skill-exe-backup-v062",
-  "engine_version": "0.7.2",
+  "engine_version": "0.7.3",
   "min_launcher_version": "0.7.1",
-  "engine_path": "launcher/pptx_offline_engine_v072.py"
+  "engine_path": "launcher/pptx_offline_engine_v073.py"
 }
