@@ -69,7 +69,7 @@ class App(tk.Tk):
         style.grid(row=5, column=1, sticky="ew")
         ttk.Label(root, text="固定、可重現的本機風格規則").grid(row=5, column=2, sticky="w", padx=(8, 0))
 
-        ttk.Button(root, text="開始美化", command=self._start_run).grid(
+        ttk.Button(root, text="開始離線美化", command=self._start_run).grid(
             row=6, column=0, columnspan=3, sticky="ew", pady=(16, 12), ipady=7
         )
 
