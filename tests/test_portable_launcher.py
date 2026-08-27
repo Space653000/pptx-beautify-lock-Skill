@@ -8,6 +8,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GUI = ROOT / "launcher" / "pptx_beautify_gui.py"
 ENGINE = ROOT / "launcher" / "pptx_offline_engine.py"
+RUNTIME = ROOT / "launcher" / "offline_runtime.py"
+UPDATER = ROOT / "launcher" / "update_manager.py"
 PORTABLE = ROOT / "launcher" / "pptx_beautify_portable.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "build-windows-launcher.yml"
 BACKUP_BAT = ROOT / "BACKUP-pptx-beautify-lock-Skill.bat"
@@ -35,26 +37,38 @@ class PortableLauncherTests(unittest.TestCase):
         self.assertIn("1. 輸入 PPTX", text)
         self.assertIn("2. 輸出 PPTX", text)
         self.assertIn("3. 美化風格", text)
-        self.assertIn("開始離線美化", text)
+        self.assertIn("開始美化", text)
         self.assertIn("asksaveasfilename", text)
         self.assertNotIn("安裝 / 更新 Skill", text)
         self.assertNotIn("全面備份", text)
         self.assertNotIn("執行模式", text)
 
-    def test_runtime_is_zero_cloud_and_does_not_read_github(self):
+    def test_beautification_stays_local_but_update_check_is_optional(self):
         gui = GUI.read_text(encoding="utf-8")
         engine = ENGINE.read_text(encoding="utf-8")
-        combined = gui + "\n" + engine
-        self.assertIn("OFFLINE_ONLY = True", gui)
+        updater = UPDATER.read_text(encoding="utf-8")
+        self.assertIn("BEAUTIFY_OFFLINE = True", gui)
         self.assertIn("CLOUD_AI_ENABLED = False", gui)
         self.assertIn("NETWORK_REQUIRED = False", gui)
+        self.assertIn("OPTIONAL_UPDATE_CHECK = True", gui)
         for forbidden in (
             "subprocess.Popen", "shutil.which", "claude.CMD", "codex exec",
-            "PROMPT_TEMPLATE", "CANONICAL_SKILL_URL", "urllib", "requests.get",
+            "PROMPT_TEMPLATE", "CANONICAL_SKILL_URL", "requests.get",
         ):
-            self.assertNotIn(forbidden, combined)
-        self.assertIn("beautify_pptx", gui)
+            self.assertNotIn(forbidden, gui + "\n" + engine)
+        self.assertNotIn("urllib", engine)
+        self.assertIn("urllib.request", updater)
+        self.assertIn("fix/separate-skill-exe-backup-v062", updater)
+        self.assertIn("beautify_to_final", gui)
         self.assertIn("CONTENT_LOCK_FAIL", engine)
+
+    def test_runtime_requires_real_final_output_before_success(self):
+        text = RUNTIME.read_text(encoding="utf-8")
+        self.assertIn("os.replace(candidate, out)", text)
+        self.assertIn("FINAL_OUTPUT_EXISTS=true", text)
+        self.assertIn("FINAL_OUTPUT_REOPEN_PASS=true", text)
+        self.assertIn("OFFLINE_BEAUTIFY_PASS=true", text)
+        self.assertIn("OUTPUT_MISSING", text)
 
     def test_backup_remains_a_separate_double_click_bat(self):
         text = BACKUP_BAT.read_text(encoding="utf-8")
