@@ -7,11 +7,11 @@ import uuid
 
 from pptx import Presentation
 
-import pptx_offline_engine as bundled_engine
+import pptx_offline_engine_v072 as bundled_engine
 from update_manager import check_for_engine_update, load_engine_module
 
-LAUNCHER_VERSION = "0.7.1"
-BUNDLED_ENGINE_VERSION = "0.7.1"
+LAUNCHER_VERSION = "0.7.2"
+BUNDLED_ENGINE_VERSION = "0.7.2"
 
 
 def _verify_pptx(path: Path, expected_slides: int) -> tuple[int, str]:
