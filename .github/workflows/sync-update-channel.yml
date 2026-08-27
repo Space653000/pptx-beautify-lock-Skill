@@ -17,8 +17,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fast-forward stable updater branch
+      - name: Mirror stable updater branch to main
         shell: bash
         run: |
           set -euo pipefail
-          git push origin HEAD:refs/heads/fix/separate-skill-exe-backup-v062
+          CHANNEL="fix/separate-skill-exe-backup-v062"
+          git fetch origin "${CHANNEL}:refs/remotes/origin/${CHANNEL}" || true
+          # This branch is a release/update mirror, never a development line.
+          # --force-with-lease handles squash-merge ancestry changes while still
+          # refusing to overwrite an unexpected concurrent remote update.
+          git push --force-with-lease="refs/heads/${CHANNEL}:$(git rev-parse refs/remotes/origin/${CHANNEL})" \
+            origin HEAD:"refs/heads/${CHANNEL}"
