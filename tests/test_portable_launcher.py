@@ -37,7 +37,7 @@ class PortableLauncherTests(unittest.TestCase):
         self.assertIn("1. 輸入 PPTX", text)
         self.assertIn("2. 輸出 PPTX", text)
         self.assertIn("3. 美化風格", text)
-        self.assertIn("開始美化", text)
+        self.assertIn("開始離線美化", text)
         self.assertIn("asksaveasfilename", text)
         self.assertNotIn("安裝 / 更新 Skill", text)
         self.assertNotIn("全面備份", text)
