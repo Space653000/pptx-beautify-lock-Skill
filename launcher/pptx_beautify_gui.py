@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Offline Windows PPTX beautifier.
-
-No external AI agent, repository access, HTTP request, or network service is used
-at runtime. The executable applies a deterministic local beautification engine.
-"""
+"""Windows PPTX beautifier with offline-first runtime and optional rule updates."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,13 +8,16 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from pptx_offline_engine import STYLE_PRESETS, beautify_pptx
+from pptx_offline_engine import STYLE_PRESETS
+from offline_runtime import LAUNCHER_VERSION, beautify_to_final
+from update_manager import UPDATE_BRANCH
 
-APP_TITLE = "PPTX Beautify Offline v0.7.0"
+APP_TITLE = f"PPTX Beautify Offline v{LAUNCHER_VERSION}"
 PRODUCT_FEATURES = ("input_pptx", "output_pptx", "style", "beautify")
-OFFLINE_ONLY = True
+BEAUTIFY_OFFLINE = True
 CLOUD_AI_ENABLED = False
 NETWORK_REQUIRED = False
+OPTIONAL_UPDATE_CHECK = True
 STYLE_CHOICES = list(STYLE_PRESETS.keys())
 
 
@@ -26,8 +25,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("920x580")
-        self.minsize(800, 500)
+        self.geometry("920x600")
+        self.minsize(800, 520)
         self._q: queue.Queue[str] = queue.Queue()
         self._busy = False
         self._build()
@@ -39,17 +38,17 @@ class App(tk.Tk):
         root.columnconfigure(1, weight=1)
         root.rowconfigure(7, weight=1)
 
-        ttk.Label(root, text="PPTX Beautify — Offline", font=("Segoe UI", 20, "bold")).grid(
+        ttk.Label(root, text="PPTX Beautify — Offline-first", font=("Segoe UI", 20, "bold")).grid(
             row=0, column=0, columnspan=3, sticky="w"
         )
         ttk.Label(
             root,
-            text="完全本機：不呼叫外部 AI、不讀 GitHub、不需要網路",
+            text="美化完全本機；有網路時只檢查 GitHub 規則更新，沒有網路照常執行",
             font=("Segoe UI", 10),
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 4))
         ttk.Label(
             root,
-            text="Deterministic local engine：Content Lock + placeholder cleanup + typography + table parity + high-confidence layout repair",
+            text=f"Update channel: {UPDATE_BRANCH}",
             font=("Segoe UI", 9),
         ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 16))
 
@@ -68,19 +67,19 @@ class App(tk.Tk):
         ttk.Label(root, text="3. 美化風格").grid(row=5, column=0, sticky="w", padx=(0, 10))
         style = ttk.Combobox(root, textvariable=self.style_var, values=STYLE_CHOICES, state="readonly")
         style.grid(row=5, column=1, sticky="ew")
-        ttk.Label(root, text="離線版使用固定、可重現的風格規則").grid(row=5, column=2, sticky="w", padx=(8, 0))
+        ttk.Label(root, text="固定、可重現的本機風格規則").grid(row=5, column=2, sticky="w", padx=(8, 0))
 
         ttk.Button(root, text="開始離線美化", command=self._start_run).grid(
             row=6, column=0, columnspan=3, sticky="ew", pady=(16, 12), ipady=7
         )
 
-        self.log = tk.Text(root, wrap="word", height=14, font=("Consolas", 9))
+        self.log = tk.Text(root, wrap="word", height=15, font=("Consolas", 9))
         self.log.grid(row=7, column=0, columnspan=3, sticky="nsew")
         scroll = ttk.Scrollbar(root, orient="vertical", command=self.log.yview)
         scroll.grid(row=7, column=3, sticky="ns")
         self.log.configure(yscrollcommand=scroll.set)
 
-        self.status_var = tk.StringVar(value="Ready — Offline")
+        self.status_var = tk.StringVar(value="Ready — Offline-capable")
         ttk.Label(root, textvariable=self.status_var).grid(
             row=8, column=0, columnspan=3, sticky="w", pady=(8, 0)
         )
@@ -129,7 +128,7 @@ class App(tk.Tk):
             messagebox.showwarning(APP_TITLE, "已有美化工作正在執行。")
             return
         self._busy = True
-        self.status_var.set("Running — Offline…")
+        self.status_var.set("Running…")
 
         def wrapper():
             try:
@@ -139,7 +138,7 @@ class App(tk.Tk):
                 self.after(0, lambda: messagebox.showerror(APP_TITLE, f"美化失敗：\n{exc}"))
             finally:
                 self._busy = False
-                self.after(0, lambda: self.status_var.set("Ready — Offline"))
+                self.after(0, lambda: self.status_var.set("Ready — Offline-capable"))
 
         threading.Thread(target=wrapper, daemon=True).start()
 
@@ -156,20 +155,33 @@ class App(tk.Tk):
             if src.resolve() == out.resolve():
                 raise ValueError("輸出檔不可覆寫來源 PPTX。")
 
-            self._emit("OFFLINE_ONLY=true")
+            self._emit("BEAUTIFY_OFFLINE=true")
             self._emit("CLOUD_AI_ENABLED=false")
             self._emit("NETWORK_REQUIRED=false")
+            self._emit("OPTIONAL_UPDATE_CHECK=true")
             self._emit(f"Input: {src}")
             self._emit(f"Output: {out}")
             self._emit(f"Style: {style}")
-            report = beautify_pptx(src, out, style, self._emit)
+
+            report = beautify_to_final(src, out, style, self._emit, check_updates=True)
+
+            if not out.is_file() or out.stat().st_size <= 0:
+                raise RuntimeError(f"FINAL_OUTPUT_MISSING_AFTER_RETURN: {out}")
+
             self._emit(
                 f"Summary: slides={report.slide_count}, tables={report.tables_styled}, "
                 f"data_layouts={report.data_slides_structured}, "
                 f"empty_placeholders={report.removed_empty_placeholders}, "
                 f"template_artifacts={report.suppressed_template_artifacts}"
             )
-            self.after(0, lambda: messagebox.showinfo(APP_TITLE, f"離線美化完成：\n{out}"))
+            final_size = out.stat().st_size
+            self.after(
+                0,
+                lambda: messagebox.showinfo(
+                    APP_TITLE,
+                    f"美化完成，而且輸出檔已重新開啟驗證：\n{out}\n\nSize: {final_size:,} bytes",
+                ),
+            )
 
         self._thread(work)
 

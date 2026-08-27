@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PyInstaller entry point for the offline PPTX beautifier."""
+"""PyInstaller entry point for the offline-first PPTX beautifier."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,18 +11,17 @@ from pptx import Presentation
 from pptx.util import Inches
 
 import pptx_beautify_gui as core
-from pptx_offline_engine import beautify_pptx
+from offline_runtime import beautify_to_final
 
 
 def _portable_self_test() -> int:
     try:
-        if not core.OFFLINE_ONLY or core.CLOUD_AI_ENABLED or core.NETWORK_REQUIRED:
+        if not core.BEAUTIFY_OFFLINE or core.CLOUD_AI_ENABLED or core.NETWORK_REQUIRED:
             return 10
-        if tuple(core.PRODUCT_FEATURES) != ("input_pptx", "output_pptx", "style", "beautify"):
+        if not core.OPTIONAL_UPDATE_CHECK:
             return 11
-        for forbidden in ("CANONICAL_SKILL_URL", "PROMPT_TEMPLATE"):
-            if hasattr(core, forbidden):
-                return 12
+        if tuple(core.PRODUCT_FEATURES) != ("input_pptx", "output_pptx", "style", "beautify"):
+            return 12
 
         tmp = Path(tempfile.mkdtemp(prefix="pptx-offline-selftest-"))
         try:
@@ -37,12 +36,26 @@ def _portable_self_test() -> int:
                 for c in range(3):
                     table.cell(r, c).text = f"R{r}C{c}"
             prs.save(src)
-            beautify_pptx(src, out, "專業技術（Technical Clean）")
+
+            logs: list[str] = []
+            beautify_to_final(
+                src,
+                out,
+                "專業技術（Technical Clean）",
+                logs.append,
+                check_updates=False,
+            )
             if not out.is_file() or out.stat().st_size < 1000:
                 return 13
+            if "FINAL_OUTPUT_EXISTS=true" not in logs:
+                return 14
+            if "FINAL_OUTPUT_REOPEN_PASS=true" not in logs:
+                return 15
+            if logs.count("OFFLINE_BEAUTIFY_PASS=true") != 1:
+                return 16
             check = Presentation(out)
             if check.slides[0].shapes.title.text != "Offline Beautifier Self Test":
-                return 14
+                return 17
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
         return 0
