@@ -1,4 +1,4 @@
-# Windows PPTX Beautifier — Offline-first v0.7.1
+# Windows PPTX Beautifier — Offline-first v0.7.3
 
 Windows EXE、GitHub Skill、Backup BAT 維持三個完全分離的產品邊界：
 
@@ -17,14 +17,80 @@ Windows EXE、GitHub Skill、Backup BAT 維持三個完全分離的產品邊界�
 
 預設風格：Source-faithful、Technical Clean、Executive Minimal、Modern Minimal、Premium Tech。
 
-## v0.7.1：成功必須等於真的有檔案
+## v0.7.3：Source-faithful = Safe-only / No-Degradation
 
-舊版可能出現 Log 已寫 `OFFLINE_BEAUTIFY_PASS=true`，但使用者在指定位置找不到輸出檔的假成功風險。v0.7.1 改成兩階段交付：
+過去的離線 formatter 會先套 generic normalization，再用 guard 修回部分字級。這仍可能造成「原稿本來比較好，美化後反而變差」。
+
+v0.7.3 改變策略：
+
+> **Source-faithful 不再先改再修，而是預設不改。Original wins ties.**
+
+當選擇：
+
+```text
+自動（忠於原稿 / Source-faithful）
+```
+
+以下視覺層全部鎖定：
+
+- shape geometry / z-order / rotation
+- font family / size / bold / italic / underline
+- word-wrap / auto-fit / vertical anchor
+- table geometry / text scale / visual style
+- picture/media geometry and crop
+- theme/master/layout/background/brand terrain
+- slide count/order
+
+預設只允許一種低風險變更：
+
+```text
+proofing metadata only
+```
+
+也就是關閉編輯器紅色拼字底線所需的非渲染 metadata；不為了「看起來有做事」而放大標題、重排 References、重染表格、加 card/panel 或換配色。
+
+### Package-level proof
+
+Source-faithful 完成後不是只比字級，而是直接驗證 PPTX ZIP package：
+
+- package member/order 必須一致；
+- 除 slide XML 的 `noProof` metadata 外，其他 package part 必須 byte-identical；
+- slide XML 移除 `noProof` 後 canonical XML 必須與來源一致；
+- semantic Content Lock 再跑一次。
+
+因此成功 Log 會包含：
+
+```text
+SOURCE_FAITHFUL_SAFE_ONLY=true
+SOURCE_CHANGE_POLICY=proofing_metadata_only
+SOURCE_PACKAGE_STRUCTURE_PASS=true
+SOURCE_VISUAL_XML_LOCK_PASS=true
+SOURCE_GEOMETRY_LOCK_PASS=true
+SOURCE_TYPOGRAPHY_LOCK_PASS=true
+SOURCE_TABLE_STYLE_LOCK_PASS=true
+SOURCE_MEDIA_LOCK_PASS=true
+SOURCE_THEME_IDENTITY_LOCK_PASS=true
+SAFE_CHANGE_BUDGET_PASS=true
+NO_DEGRADATION_GATE_PASS=true
+CONTENT_LOCK_PASS=true
+```
+
+任何一項不成立：刪除 candidate，FAIL CLOSED。
+
+## Transformative styles
+
+`Technical Clean / Executive Minimal / Modern Minimal / Premium Tech` 是使用者明確 opt-in 的 transformation，不等於 Source-faithful。
+
+本機規則引擎沒有大型視覺模型，因此 transformative style 的能力上限低於 AI Skill；需要 bespoke art direction 時，請使用 canonical Skill URL 交給 AI Agent。
+
+## 成功必須等於真的有檔案
+
+交付仍採兩階段：
 
 ```text
 source.pptx
-→ 產生同資料夾 temporary candidate
-→ Content Lock
+→ 產生 temporary candidate
+→ engine guards / Content Lock
 → candidate reopen / slide-count verification
 → atomic os.replace(candidate, final)
 → final exists / size / reopen verification
@@ -43,11 +109,9 @@ FINAL_OUTPUT_PATH=<exact path>
 OFFLINE_BEAUTIFY_PASS=true
 ```
 
-只要 final output 不存在、為 0 bytes、無法重新開啟、slide count 不符，全部 FAIL CLOSED，不顯示成功。
-
 ## Optional update channel
 
-美化引擎仍可完全離線工作；網路不是必要條件：
+美化引擎完全可以離線工作；網路不是必要條件：
 
 ```text
 BEAUTIFY_OFFLINE=true
@@ -56,74 +120,57 @@ NETWORK_REQUIRED=false
 OPTIONAL_UPDATE_CHECK=true
 ```
 
-當有網路時，EXE 會依使用者指定的 stable update branch 檢查：
+有網路時才檢查 stable update branch：
 
 ```text
 https://github.com/Space653000/pptx-beautify-lock-Skill/tree/fix/separate-skill-exe-backup-v062
 ```
 
-實際流程會先透過 GitHub branch API 取得該 branch 的 commit SHA，再從同一 SHA 讀取：
+流程會讀取該 branch 的 commit SHA，再讀：
 
 ```text
 launcher/update_manifest.json
-launcher/pptx_offline_engine.py
+```
+
+manifest 指定目前 engine path，例如 v0.7.3：
+
+```text
+launcher/pptx_offline_engine_v073.py
 ```
 
 規則：
 
-- remote engine version **高於**目前有效版本：下載到 `%LOCALAPPDATA%\PPTXBeautifyOffline\engine_updates\`，下次即使離線也可使用已快取版本。
-- remote version 相同或更舊：不更新，**禁止降級**。
-- 沒網路、DNS/Proxy/Firewall 阻擋：`UPDATE_CHECK=offline_skip`，立即使用內建或已快取 engine，正常美化。
-- remote engine 要求更高 launcher version：不硬套，Log `UPDATE_STATUS=new_exe_required`，繼續使用相容版本。
-
-Windows 執行中的 EXE 不直接覆寫自己；自動更新的是 **beautification engine / rules package**。若未來 launcher/UI 本身需要升級，manifest 會要求新版 EXE，避免把不相容 Python engine 強塞進舊 shell。
-
-`fix/separate-skill-exe-backup-v062` 已被定義為 stable update channel；GitHub Action `sync-update-channel` 會在 `main` 正式更新後 fast-forward 該 branch，避免舊 branch 造成降級。
-
-## Local engine capabilities
-
-離線 engine 目前做：
-
-- semantic Content Lock，任何 protected content 差異即 FAIL
-- 空 placeholder 清理
-- generic template placeholder artifact 以幾何方式移出畫布，保留 semantic text
-- Traditional Chinese / English 安全字體正規化
-- POWER / THD / HOHD 類 sibling table 視覺一致化
-- 高信心 data-slide grid：summary + table + L/R evidence panels
-- cover 品牌地形保護與 light/dark canvas 判定
-- source-faithful accent discovery
-- 不覆寫來源檔
-
-## Important limitation
-
-本機 EXE 沒有大型語言／視覺模型，因此它是**規則式、可重現、保守的版面與格式引擎**，不是 Claude / Codex 的離線替身。它適合大量工程簡報的結構清理與一致化；需要全新視覺概念、語意層次判斷、世界級 bespoke art direction 時，仍應讓 AI Agent 直接讀 canonical Skill URL。
+- remote engine version 高於目前有效版本：下載到 `%LOCALAPPDATA%\PPTXBeautifyOffline\engine_updates\`。
+- remote version 相同或更舊：不更新，禁止降級。
+- 沒網路 / DNS / Proxy / Firewall 阻擋：`UPDATE_CHECK=offline_skip`，正常使用內建或 cache engine。
+- remote engine 要求更高 launcher version：Log `UPDATE_STATUS=new_exe_required`，不強塞不相容 engine。
 
 ## Runtime requirements
 
 - Windows 10/11
 - 不需要 Claude Code
 - 不需要 Codex
-- 不需要登入任何雲端 AI
+- 不需要登入雲端 AI
 - 不需要 Git
 - 不需要另外安裝 Python
-- **不需要網路即可美化**；有網路時只做可選更新檢查
+- 不需要網路即可美化
 
 ## Build gate
 
-GitHub Actions 會安裝並封裝 `python-pptx`, Pillow, lxml、Content Lock、offline runtime 與 updater，建立：
+GitHub Actions 建立：
 
 ```text
 PPTX-Beautify-Offline.exe
 ```
 
-Windows runner 必須實際執行：
+Windows runner 必須真的執行：
 
 ```text
 PPTX-Beautify-Offline.exe --portable-self-test
 ```
 
-Self-test 會建立一份臨時 PPTX、停用網路更新、執行本機美化、Content Lock、atomic finalization，然後確認 final output 真實存在並可重新開啟；未通過不得上傳 artifact。
+未通過不得上傳 artifact。
 
 ## Standalone backup BAT
 
-`BACKUP-pptx-beautify-lock-Skill.bat` 仍是另一個完全獨立工具。放到任意資料夾雙擊後，會把完整 Git repository 抓到 BAT 同層的 `pptx-beautify-lock-Skill\`。這個 BAT 需要 Git for Windows；它與 Offline EXE 沒有執行依賴。
+`BACKUP-pptx-beautify-lock-Skill.bat` 是另一個完全獨立工具。放到任意資料夾雙擊後，把完整 Git repository 抓到 BAT 同層的 `pptx-beautify-lock-Skill\`。此 BAT 需要 Git for Windows；它與 Offline EXE 無執行依賴。
