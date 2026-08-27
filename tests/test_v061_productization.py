@@ -5,7 +5,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-class V061ProductizationTests(unittest.TestCase):
+class V062ProductizationTests(unittest.TestCase):
     def test_launcher_compiles(self):
         launcher = ROOT / "launcher" / "pptx_beautify_gui.py"
         self.assertTrue(launcher.is_file())
@@ -22,6 +22,7 @@ class V061ProductizationTests(unittest.TestCase):
             "CLOUD_AI_ENABLED = False",
             "NETWORK_REQUIRED = False",
             "OPTIONAL_UPDATE_CHECK = True",
+            "Safe-only",
         ]:
             self.assertIn(required, text)
         for forbidden in [
@@ -50,12 +51,24 @@ class V061ProductizationTests(unittest.TestCase):
         ]:
             self.assertIn(required, guard)
 
-    def test_skill_is_v061_and_loads_guardrails(self):
+    def test_skill_is_v062_and_loads_no_degradation_guard(self):
         skill = (ROOT / "pptx-beautify-lock" / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn('version: "0.6.1"', skill)
+        self.assertIn('version: "0.6.2"', skill)
         self.assertIn("references/REGRESSION_GUARDRAILS.md", skill)
+        self.assertIn("references/NO_DEGRADATION_RULES.md", skill)
+        self.assertIn("NO_DEGRADATION_GATE_PASS=true", skill)
         self.assertIn("FULL_DECK_REGRESSION_PASS=true", skill)
         self.assertIn("FONT_PORTABILITY_PASS=true", skill)
+
+    def test_no_degradation_reference_is_explicit(self):
+        rules = (ROOT / "pptx-beautify-lock" / "references" / "NO_DEGRADATION_RULES.md").read_text(encoding="utf-8")
+        for required in [
+            "Original wins ties",
+            "proofing metadata only",
+            "Safe-change budget",
+            "A no-op is better than a harmful edit",
+        ]:
+            self.assertIn(required, rules)
 
     def test_backup_is_standalone_bat_next_to_repo_root(self):
         bat = ROOT / "BACKUP-pptx-beautify-lock-Skill.bat"
