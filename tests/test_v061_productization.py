@@ -11,20 +11,20 @@ class V061ProductizationTests(unittest.TestCase):
         self.assertTrue(launcher.is_file())
         py_compile.compile(str(launcher), doraise=True)
 
-    def test_launcher_is_beautify_only_and_fully_offline(self):
+    def test_launcher_is_beautify_only_offline_capable_with_optional_update(self):
         text = (ROOT / "launcher" / "pptx_beautify_gui.py").read_text(encoding="utf-8")
         for required in [
             "1. 輸入 PPTX",
             "2. 輸出 PPTX",
             "3. 美化風格",
             "開始離線美化",
-            "OFFLINE_ONLY = True",
+            "BEAUTIFY_OFFLINE = True",
             "CLOUD_AI_ENABLED = False",
             "NETWORK_REQUIRED = False",
+            "OPTIONAL_UPDATE_CHECK = True",
         ]:
             self.assertIn(required, text)
         for forbidden in [
-            "https://github.com/Space653000/pptx-beautify-lock-Skill",
             "open and read this canonical Skill repository",
             "PROMPT_TEMPLATE",
             "subprocess.Popen",
